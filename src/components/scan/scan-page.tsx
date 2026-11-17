@@ -35,7 +35,6 @@ export function ScanPage() {
 
   const [step, setStep] = useState<Step>("upload");
   const [image, setImage] = useState<ProcessedImage | null>(null);
-  const [rotation, setRotation] = useState(0);
   const [category, setCategory] = useState<CategoryInput>("auto");
   const [timezone, setTimezone] = useState(() =>
     typeof Intl !== "undefined" ? Intl.DateTimeFormat().resolvedOptions().timeZone : "Asia/Dhaka",
@@ -128,9 +127,12 @@ export function ScanPage() {
   const handleRotate = async (degrees: 90 | -90) => {
     if (!image) return;
     try {
+      // Rotate the pixels only. The preview shows image.dataUrl as-is,
+      // so the preview and the bytes sent to /api/extract always match.
+      // (Previously this also incremented a CSS rotation, so one click
+      // turned the preview 180° while the upload was only rotated 90°.)
       const dataUrl = await rotateDataUrl(image.dataUrl, degrees);
       setImage({ ...image, dataUrl });
-      setRotation((r) => (r + degrees + 360) % 360);
     } catch {
       setError(t("couldNotRead"));
     }
@@ -158,7 +160,6 @@ export function ScanPage() {
   const resetAll = () => {
     setStep("upload");
     setImage(null);
-    setRotation(0);
     setResult(null);
     setEvents([]);
     setMedicineVerified(false);
@@ -213,13 +214,12 @@ export function ScanPage() {
           <Dropzone
             onImage={(img) => {
               setImage(img);
-              setRotation(0);
               setError(null);
             }}
             onError={setError}
           />
           {image && (
-            <ImageViewer dataUrl={image.dataUrl} rotation={rotation} onRotate={handleRotate} onReplace={() => setImage(null)} />
+            <ImageViewer dataUrl={image.dataUrl} onRotate={handleRotate} onReplace={() => setImage(null)} />
           )}
           <p className="flex items-center gap-2 text-sm text-muted-foreground">
             <ShieldCheck className="size-4 shrink-0 text-success" aria-hidden />
@@ -327,7 +327,7 @@ export function ScanPage() {
 
           <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
             <div className={cn(mobileTab === "photo" ? "block" : "hidden", "lg:block")}>
-              <ImageViewer dataUrl={image.dataUrl} rotation={rotation} onRotate={handleRotate} onReplace={() => { setImage(null); setStep("upload"); }} />
+              <ImageViewer dataUrl={image.dataUrl} onRotate={handleRotate} onReplace={() => { setImage(null); setStep("upload"); }} />
             </div>
             <div className={cn(mobileTab === "events" ? "block" : "hidden", "lg:block")}>
               <EventsEditor

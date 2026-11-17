@@ -7,13 +7,20 @@ import { Button } from "@/components/ui/button";
 
 interface ImageViewerProps {
   dataUrl: string;
-  rotation: number;
   onRotate: (degrees: 90 | -90) => void;
   onReplace: () => void;
 }
 
-/** Image preview with zoom and rotate controls. */
-export function ImageViewer({ dataUrl, rotation, onRotate, onReplace }: ImageViewerProps) {
+/**
+ * Image preview with zoom and rotate controls.
+ *
+ * The image is fit to the container width at 100% zoom (width: 100%),
+ * so the whole routine is visible on first paint. Zoom scales from that
+ * fitted view: 100% = fit, 200% = twice the fitted width (scrollable),
+ * 50% = half. Rotation is done on the pixels by the parent (rotateDataUrl),
+ * never as a CSS transform here, so what you see is what gets uploaded.
+ */
+export function ImageViewer({ dataUrl, onRotate, onReplace }: ImageViewerProps) {
   const t = useTranslations("scan");
   const [zoom, setZoom] = useState(1);
 
@@ -61,8 +68,8 @@ export function ImageViewer({ dataUrl, rotation, onRotate, onReplace }: ImageVie
         <img
           src={dataUrl}
           alt={t("imageAlt")}
-          className="mx-auto max-w-none rounded-[10px] transition-transform duration-200 motion-reduce:transition-none"
-          style={{ transform: `rotate(${rotation}deg) scale(${zoom})`, transformOrigin: "center" }}
+          className="mx-auto block h-auto rounded-[10px]"
+          style={{ width: `${zoom * 100}%` }}
         />
       </div>
     </figure>

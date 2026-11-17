@@ -253,18 +253,19 @@ pm2 start pnpm --name routinesnap -- start
 pm2 save && pm2 startup
 ```
 
-Or with Docker (outline — no Dockerfile is shipped yet):
+Or with Docker — a `Dockerfile` is shipped in the repo root:
 
-```dockerfile
-FROM node:20-alpine
-WORKDIR /app
-COPY package.json pnpm-lock.yaml ./
-RUN corepack enable && pnpm install --frozen-lockfile
-COPY . .
-RUN pnpm build
-ENV NODE_ENV=production PORT=3000
-CMD ["pnpm", "start"]
+```bash
+docker build -t routinesnap .
+docker run -p 3000:3000 --env-file .env.local routinesnap
 ```
+
+It is a three-stage build (deps → builder → runner) on `node:20-alpine`,
+so the final image carries only the production server, `.next`, and
+`public`. Set `NEXT_PUBLIC_SITE_URL` to your real domain in
+`.env.local` before building. Note: the image was not build-tested in
+this environment (no Docker here) — run the build on your server or PC
+first and report any error.
 
 Note the in-memory rate-limit fallback counts per server process — with
 more than one server instance, set up Upstash Redis so the limit is

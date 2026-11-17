@@ -10,6 +10,8 @@
 
 export const MAX_IMAGE_BYTES = 8 * 1024 * 1024; // 8 MB
 export const MAX_LONG_EDGE = 2000;
+/** JPEG encode quality: high enough that small time text stays legible. */
+export const JPEG_QUALITY = 0.92;
 
 export const ACCEPTED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"];
 export const ACCEPTED_EXTENSIONS = [".jpg", ".jpeg", ".png", ".webp", ".heic", ".heif"];
@@ -85,7 +87,7 @@ async function resizeDataUrl(
     canvas.toBlob(
       (b) => (b ? resolve(b) : reject(new Error("Could not process this image."))),
       "image/jpeg",
-      0.85,
+      JPEG_QUALITY,
     );
   });
   return {
@@ -109,7 +111,7 @@ export async function processImageFile(file: File): Promise<ProcessedImage> {
   if (isHeicFile(file)) {
     // heic2any is loaded lazily so non-HEIC users never download it.
     const heic2any = (await import("heic2any")).default;
-    const converted = (await heic2any({ blob: file, toType: "image/jpeg", quality: 0.85 })) as Blob;
+    const converted = (await heic2any({ blob: file, toType: "image/jpeg", quality: JPEG_QUALITY })) as Blob;
     working = converted;
     convertedFromHeic = true;
   }
@@ -118,17 +120,26 @@ export async function processImageFile(file: File): Promise<ProcessedImage> {
   return { ...resized, convertedFromHeic };
 }
 
+/** Dimensions of an image after rotating by ±90° (swapped) or 180° (same). */
+export function rotatedDimensions(
+  width: number,
+  height: number,
+  degrees: 90 | -90 | 180,
+): { width: number; height: number } {
+  return Math.abs(degrees) === 90 ? { width: height, height: width } : { width, height };
+}
+
 /** Rotate a data-URL image by ±90° (or 180°) and return a new data URL. */
 export async function rotateDataUrl(dataUrl: string, degrees: 90 | -90 | 180): Promise<string> {
   const img = await loadImage(dataUrl);
-  const swap = Math.abs(degrees) === 90;
+  const { width, height } = rotatedDimensions(img.naturalWidth, img.naturalHeight, degrees);
   const canvas = document.createElement("canvas");
-  canvas.width = swap ? img.naturalHeight : img.naturalWidth;
-  canvas.height = swap ? img.naturalWidth : img.naturalHeight;
+  canvas.width = width;
+  canvas.height = height;
   const ctx = canvas.getContext("2d");
   if (!ctx) throw new Error("Canvas is not available in this browser.");
   ctx.translate(canvas.width / 2, canvas.height / 2);
   ctx.rotate((degrees * Math.PI) / 180);
   ctx.drawImage(img, -img.naturalWidth / 2, -img.naturalHeight / 2);
-  return canvas.toDataURL("image/jpeg", 0.9);
+  return canvas.toDataURL("image/jpeg", JPEG_QUALITY);
 }

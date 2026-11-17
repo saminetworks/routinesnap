@@ -29,7 +29,7 @@ export async function Maker() {
               aria-hidden
               className="bg-gradient-primary flex size-11 items-center justify-center rounded-full text-base font-extrabold text-white"
             >
-              RS
+              A
             </span>
             <span>
               <span className="block text-sm font-semibold">{t("name")}</span>
