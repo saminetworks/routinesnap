@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="512" y2="512" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#6366F1"/>
+      <stop offset="1" stop-color="#8B5CF6"/>
+    </linearGradient>
+  </defs>
+  <!-- Maskable variant: same artwork scaled to 80% and centred, so the
+       mark survives the OS safe-zone crop (maskable icons are cropped
+       to a circle ~80% of the canvas on some launchers). The gradient
+       still bleeds to the full canvas edge. -->
+  <rect width="512" height="512" fill="url(#bg)"/>
+  <g transform="translate(51.2 51.2) scale(0.8)">
+    <rect x="106" y="128" width="300" height="272" rx="36" fill="#FFFFFF"/>
+    <path d="M106 164 a36 36 0 0 1 36 -36 h228 a36 36 0 0 1 36 36 v28 H106 Z" fill="#6366F1"/>
+    <rect x="156" y="100" width="30" height="56" rx="15" fill="#FFFFFF"/>
+    <rect x="326" y="100" width="30" height="56" rx="15" fill="#FFFFFF"/>
+    <rect x="138" y="216" width="64" height="64" rx="14" fill="#6366F1"/>
+    <rect x="224" y="216" width="64" height="64" rx="14" fill="#C7D2FE"/>
+    <rect x="310" y="216" width="64" height="64" rx="14" fill="#10B981"/>
+    <rect x="138" y="304" width="64" height="64" rx="14" fill="#DDD6FE"/>
+    <rect x="224" y="304" width="64" height="64" rx="14" fill="#8B5CF6"/>
+    <rect x="310" y="304" width="64" height="64" rx="14" fill="#C7D2FE"/>
+    <circle cx="392" cy="388" r="46" fill="#10B981" stroke="#FFFFFF" stroke-width="10"/>
+    <path d="M372 388 l14 14 l26 -30" fill="none" stroke="#FFFFFF" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+</svg>

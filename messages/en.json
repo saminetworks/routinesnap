@@ -1,0 +1,469 @@
+{
+    "common": {
+        "back": "Back",
+        "cancel": "Cancel",
+        "close": "Close",
+        "delete": "Delete",
+        "loading": "Loading…",
+        "save": "Save",
+        "scanAnother": "Scan another",
+        "scanNow": "Scan a routine",
+        "seeHowItWorks": "See how it works",
+        "skipToContent": "Skip to content"
+    },
+    "footer": {
+        "brandBlurb": "Turn any schedule photo into calendar events with reminders — free, private, and in seconds.",
+        "copyright": "© {year} RoutineSnap. All rights reserved.",
+        "languages": "Languages",
+        "madeWith": "Made with care in Bangladesh/Japan",
+        "product": "Product",
+        "resources": "Resources",
+        "tagline": "Snap your routine. Never miss a thing.",
+        "privacy": "Privacy",
+        "terms": "Terms"
+    },
+    "home": {
+        "badge": "Free. No sign-up. Photos never stored.",
+        "cta": {
+            "subtitle": "Upload a photo and your first reminders are a minute away.",
+            "title": "Ready to stop forgetting?"
+        },
+        "faq": {
+            "items": [
+                {
+                    "a": "Yes. RoutineSnap is free for up to 5 scans per day. No account and no payment card are needed.",
+                    "q": "Is it free?"
+                },
+                {
+                    "a": "No. Your photo is sent securely, processed in memory, and discarded. Nothing is stored on our servers. If you choose to save a scan, it is kept only in your own browser (IndexedDB) on your device.",
+                    "q": "Is my photo stored?"
+                },
+                {
+                    "a": "Bangla, English and Japanese — including Bangla and Japanese digits and numerals in photos. The whole interface is available in all three languages.",
+                    "q": "Which languages work?"
+                },
+                {
+                    "a": "Yes. It works in the browser on iPhone, Android and desktop, and you can add it to your home screen as an app (PWA).",
+                    "q": "Does it work on iPhone?"
+                },
+                {
+                    "a": "Reminders are added to your calendar events as alarms (VALARM in the .ics file), so your phone's calendar app reminds you — no push notification setup is needed. You choose how long before each event, for example 30 minutes.",
+                    "q": "How do reminders work?"
+                },
+                {
+                    "a": "You always review the extracted events before anything is saved. Low-confidence fields are highlighted in amber with a “Please check” note, and you can edit, delete or add events.",
+                    "q": "What if the AI reads something wrong?"
+                },
+                {
+                    "a": "You need the internet to extract events from a photo, because the vision AI runs on the server. Your saved history works offline, and the app shell is cached for offline use.",
+                    "q": "Can I use it offline?"
+                },
+                {
+                    "a": "RoutineSnap is a helper, not medical advice. Always follow your doctor's prescription. Before you can export a medicine schedule you must tick a box confirming you verified every dose against your prescription.",
+                    "q": "Is medicine scheduling safe?"
+                },
+                {
+                    "a": "Google Calendar, Apple Calendar, Outlook and Samsung Calendar. Download a .ics file or use the per-event “Add to Google Calendar” link — no sign-in is needed for that link.",
+                    "q": "Which calendars are supported?"
+                },
+                {
+                    "a": "Yes. RoutineSnap is a PWA: on Android, use your browser's “Install app” option; on iPhone, use Share → Add to Home Screen.",
+                    "q": "Can I install it as an app?"
+                }
+            ],
+            "subtitle": "Everything people usually ask before their first scan.",
+            "title": "Frequently asked questions"
+        },
+        "features": {
+            "items": [
+                {
+                    "description": "Class routines, exam schedules, duty rosters and prescriptions in Bangla, English and Japanese — including handwritten-style tables and screenshots.",
+                    "title": "Reads any photo"
+                },
+                {
+                    "description": "Upload. Convert. Vanish. Your photo is processed in memory and never stored on our servers.",
+                    "title": "Privacy first"
+                },
+                {
+                    "description": "Nothing is added to your calendar without you. You review and edit every event first, and low-confidence fields are flagged for a second look.",
+                    "title": "Check before you save"
+                }
+            ],
+            "subtitle": "Built for the way schedules actually arrive — as a photo in a chat.",
+            "title": "Why RoutineSnap"
+        },
+        "heroMockup": {
+            "arrowLabel": "becomes",
+            "event1Meta": "Mon 09:00 – 10:00 · Room 204",
+            "event1Title": "Physics class",
+            "event2Meta": "Mon 18:00 – 22:00 · Night shift",
+            "event2Title": "Baito shift",
+            "event3Meta": "Tue 08:00 · After breakfast",
+            "event3Title": "Medicine",
+            "eventsLabel": "Calendar events",
+            "photoCaption": "Routine photo",
+            "photoLabel": "Class routine",
+            "photoRow1": "Mon  09:00  Physics",
+            "photoRow2": "Tue  10:00  Maths",
+            "photoRow3": "Wed  09:00  Chemistry"
+        },
+        "how": {
+            "notifications": {
+                "items": [
+                    {
+                        "body": "Physics class in 30 min, Room 204",
+                        "title": "RoutineSnap"
+                    },
+                    {
+                        "body": "Shift starts at 18:00",
+                        "title": "RoutineSnap"
+                    },
+                    {
+                        "body": "Take your evening medicine",
+                        "title": "RoutineSnap"
+                    }
+                ],
+                "lockDate": "Monday, 16 November",
+                "lockTime": "9:41",
+                "now": "now"
+            },
+            "reminderChip": "Reminder set: 30 min before",
+            "steps": [
+                {
+                    "description": "Drag and drop, pick a file, use your camera, or paste from the clipboard.",
+                    "title": "Upload a photo"
+                },
+                {
+                    "description": "Class routine, exam, duty roster, invitation, medicine or fixture — or let it auto-detect.",
+                    "title": "Pick a category"
+                },
+                {
+                    "description": "Check every event, fix anything the AI was unsure about, and add or remove rows.",
+                    "title": "Review and edit"
+                },
+                {
+                    "description": "Download an .ics file or add events to Google Calendar — reminders included.",
+                    "title": "Add to calendar with reminders"
+                }
+            ],
+            "subtitle": "From a messy photo to reminders on your phone in under a minute.",
+            "title": "How it works"
+        },
+        "maker": {
+            "name": "Sami Zawata Afnan",
+            "quote": "I kept missing classes, shifts and medicine because the schedule lived as a photo in a chat. I built RoutineSnap so nobody has to type a routine out by hand ever again.",
+            "role": "Founder",
+            "title": "Built by someone who kept forgetting"
+        },
+        "stats": {
+            "items": [
+                {
+                    "label": "categories",
+                    "value": "6"
+                },
+                {
+                    "label": "languages",
+                    "value": "3"
+                },
+                {
+                    "label": "photos stored",
+                    "value": "0"
+                }
+            ]
+        },
+        "subtitle": "Turn any class routine, duty roster, exam schedule, invitation card or prescription photo into calendar events with reminders in seconds.",
+        "title": "Snap your routine. Never miss a thing.",
+        "useCases": {
+            "subtitle": "Pick one — each has its own tips and examples.",
+            "title": "What can you snap?"
+        },
+        "why": {
+            "p1": "Most schedules never arrive as a neat file. They arrive as a photo in WhatsApp or Messenger — a class routine pinned on a notice board, a duty roster screenshot, a wedding invitation, a prescription. Typing them into a calendar by hand is slow, and one missed line means a missed class, a missed shift, or a missed dose. A photo to calendar tool fixes exactly that: snap it, check it, and your calendar does the remembering.",
+            "p2": "RoutineSnap was built for students and workers in Bangladesh, Japan and India, where routines really do travel as photos. It reads Bangla, English and Japanese text, understands weekly class routines, night shifts that cross midnight, and exam dates — and turns them into a standard image to ICS file or Google Calendar events, with reminders attached.",
+            "p3": "And it does all of this without keeping your photos. Images are processed in memory and discarded, so a class routine to calendar or duty roster to calendar conversion leaves no copy behind. No account, no tracking, no storage — just your schedule, on your calendar, on time.",
+            "title": "Why it matters"
+        }
+    },
+    "language": {
+        "bangla": "বাংলা",
+        "english": "English",
+        "japanese": "日本語",
+        "label": "Language"
+    },
+    "nav": {
+        "about": "About",
+        "blog": "Blog",
+        "closeMenu": "Close menu",
+        "history": "History",
+        "menu": "Menu",
+        "scan": "Scan",
+        "templates": "Templates"
+    },
+    "theme": {
+        "dark": "Dark",
+        "label": "Theme",
+        "light": "Light",
+        "system": "System"
+    },
+    "scan": {
+        "title": "Scan a routine",
+        "subtitle": "Upload a photo of any schedule and turn it into calendar events with reminders.",
+        "privacy": "Your photo is sent securely, processed, and not saved.",
+        "stepUpload": "Upload",
+        "stepConfirm": "Review & edit",
+        "stepExport": "Export",
+        "dropzoneTitle": "Drop your routine photo here",
+        "dropzoneHint": "or click to browse — JPG, PNG, WEBP or HEIC, up to 8 MB",
+        "browse": "Browse files",
+        "useCamera": "Use camera",
+        "pasteHint": "You can also paste an image with Ctrl+V (Cmd+V on Mac).",
+        "replace": "Replace",
+        "rotateLeft": "Rotate left",
+        "rotateRight": "Rotate right",
+        "zoomIn": "Zoom in",
+        "zoomOut": "Zoom out",
+        "imageAlt": "Uploaded routine photo",
+        "photoTab": "Photo",
+        "eventsTab": "Events",
+        "categoryLabel": "Category",
+        "autoDetect": "Auto detect",
+        "categoryHint": "Pick the closest match, or leave it on auto detect.",
+        "timezoneLabel": "Timezone",
+        "startDateLabel": "Start date for weekly routines",
+        "repeatUntilLabel": "Repeat weekly until",
+        "reminderLabel": "Default reminder",
+        "reminderNone": "None",
+        "reminder10": "10 minutes before",
+        "reminder30": "30 minutes before",
+        "reminder60": "1 hour before",
+        "reminder1440": "1 day before",
+        "reminder120": "2 hours before",
+        "extract": "Extract schedule",
+        "extracting": "Reading your photo…",
+        "extractingMessages": [
+            "Reading your photo…",
+            "Finding dates and times…",
+            "Checking rooms and locations…",
+            "Almost done…"
+        ],
+        "extractError": "We couldn't read that photo. Please try a clearer photo and try again.",
+        "fileTooLarge": "That image is larger than 8 MB. Please use a smaller image.",
+        "unsupportedType": "Please use a JPG, PNG, WEBP or HEIC image.",
+        "couldNotRead": "We couldn't read that file. Please try another image.",
+        "noImage": "Please upload a photo first.",
+        "eventsFound": "{count} events found",
+        "warningsTitle": "Please double-check these",
+        "assumptionsTitle": "What we assumed",
+        "confidenceHigh": "High confidence",
+        "confidenceMedium": "Medium confidence",
+        "confidenceLow": "Low confidence",
+        "pleaseCheck": "Please check",
+        "selectAll": "Select all",
+        "deselectAll": "Deselect all",
+        "deleteSelected": "Delete selected",
+        "shiftLabel": "Shift all times by (minutes)",
+        "shiftApply": "Apply shift",
+        "setReminderAll": "Set reminder for all",
+        "addEvent": "Add event",
+        "eventDeleted": "Event deleted",
+        "undo": "Undo",
+        "removeEvent": "Remove event",
+        "fieldTitle": "Title",
+        "fieldDate": "Date",
+        "fieldWeekday": "Weekday",
+        "fieldStart": "Start",
+        "fieldEnd": "End",
+        "fieldLocation": "Location",
+        "fieldNotes": "Notes",
+        "fieldReminders": "Reminders",
+        "addReminder": "Add reminder",
+        "removeReminder": "Remove reminder",
+        "reminderCustom": "{minutes} minutes before",
+        "fieldRepeats": "Repeats weekly",
+        "fieldAllDay": "All day",
+        "weekdays": {
+            "MO": "Monday",
+            "TU": "Tuesday",
+            "WE": "Wednesday",
+            "TH": "Thursday",
+            "FR": "Friday",
+            "SA": "Saturday",
+            "SU": "Sunday"
+        },
+        "weekdaysShort": {
+            "MO": "Mon",
+            "TU": "Tue",
+            "WE": "Wed",
+            "TH": "Thu",
+            "FR": "Fri",
+            "SA": "Sat",
+            "SU": "Sun"
+        },
+        "medicineNotice": "This is a helper, not medical advice. Always follow your doctor's prescription.",
+        "medicineCheckbox": "I verified these doses against my prescription",
+        "medicineRequired": "Please tick the verification box before exporting a medicine schedule.",
+        "exportTitle": "Export your events",
+        "exportSubtitle": "Choose how to add them to your calendar.",
+        "downloadIcs": "Download .ics (all events)",
+        "downloadIcsNote": "Downloads a .ics file you can import into Google, Apple, Outlook or Samsung Calendar.",
+        "googleCalendar": "Add to Google Calendar",
+        "copyText": "Copy as text",
+        "copied": "Copied to clipboard",
+        "shareWhatsapp": "Share on WhatsApp",
+        "saveHistory": "Save to local history",
+        "saveHistoryNote": "Saved only in this browser, never on our server. Manage it from the History page.",
+        "successTitle": "Done! Your events are ready.",
+        "successText": "Add them to your calendar and you're set. Scan another photo any time.",
+        "backToUpload": "Back to upload",
+        "importHelpTitle": "How to import the .ics file",
+        "icsError": "We couldn't create the .ics file. Please try again.",
+        "importHelpGoogleTitle": "Google Calendar",
+        "importHelpGoogleBody": "Open Google Calendar → Settings → Import & export → Import, then choose your .ics file.",
+        "importHelpIphoneTitle": "iPhone (Apple Calendar)",
+        "importHelpIphoneBody": "Open the .ics file and tap “Add All”. The events are added to your Apple Calendar.",
+        "importHelpAndroidTitle": "Android",
+        "importHelpAndroidBody": "Open the .ics file with Google Calendar, or import it from Google Calendar → Settings → Import & export.",
+        "noEvents": "No events yet. Add one below, or go back and try another photo.",
+        "titleRequired": "Title is required",
+        "invalidTime": "Use HH:mm, for example 09:00",
+        "rateLimited": "You've used today's free scans. Please try again tomorrow.",
+        "invalidImage": "That photo couldn't be used. Please try a JPG, PNG or WEBP photo under 8 MB.",
+        "serverError": "Something went wrong on our side. Please try again in a moment.",
+        "saveHistorySaved": "Saved to this browser's history."
+    },
+    "templates": {
+        "title": "Templates",
+        "subtitle": "Start from the kind of schedule you have. Each template explains what RoutineSnap looks for and how to get a clean scan.",
+        "scanCta": "Scan this type",
+        "tipsTitle": "Tips for a clean scan",
+        "rulesTitle": "What RoutineSnap looks for",
+        "exampleTitle": "Example photo",
+        "exampleCaption": "A photo like this turns into calendar events in seconds.",
+        "howTitle": "How it works",
+        "howSteps": [
+            "Upload a photo of your schedule",
+            "Check the events we found",
+            "Download the .ics file or add events to Google Calendar"
+        ],
+        "recurrenceLabel": "Repeats",
+        "recurrenceWeekly": "Weekly",
+        "recurrenceOneOff": "One-off",
+        "recurrenceDaily": "Daily",
+        "backToTemplates": "All templates",
+        "categoryHintsTitle": "Good to know"
+    },
+    "history": {
+        "title": "History",
+        "subtitle": "Scans you saved in this browser. Nothing here is stored on our server.",
+        "privacyNote": "History lives only in this browser (IndexedDB). Clearing your browser data deletes it. It is never uploaded.",
+        "emptyTitle": "No saved scans yet",
+        "emptyText": "When you scan a routine, tick “Save to local history” on the export step and it will show up here.",
+        "scanCta": "Scan a routine",
+        "eventsCount": "{count} events",
+        "savedOn": "Saved {date}",
+        "viewEvents": "View events",
+        "hideEvents": "Hide events",
+        "downloadIcs": "Download .ics",
+        "delete": "Delete",
+        "deleteAll": "Delete all",
+        "deleteAllConfirm": "Delete all saved scans? This cannot be undone.",
+        "deleteConfirm": "Delete this saved scan?",
+        "saved": "Saved to this browser"
+    },
+    "blog": {
+        "title": "Blog",
+        "subtitle": "Notes on turning schedule photos into calendars — and on doing it privately.",
+        "englishNote": "Posts are written in English for now. Bangla and Japanese translations are coming.",
+        "readMore": "Read more",
+        "backToBlog": "All posts",
+        "minRead": "{count} min read"
+    },
+    "privacy": {
+        "title": "Privacy policy",
+        "intro": "RoutineSnap is built to forget. This policy explains, in plain language, what happens to your photos and what we never store.",
+        "sections": [
+            {
+                "heading": "What we process",
+                "body": "When you upload a photo, it is sent securely to our server, read by the vision AI, and turned into calendar events. The image and the extracted events are processed in memory and discarded as soon as your result is returned. They are never saved to disk or to a database."
+            },
+            {
+                "heading": "What we store",
+                "body": "We run no database in v1 and store no photos, no extracted schedules, and no account data on the server. The only thing that can be stored is your optional local history, which lives in your own browser (IndexedDB) and never leaves your device."
+            },
+            {
+                "heading": "Cookies and trackers",
+                "body": "RoutineSnap is cookie-free by default and uses no third-party trackers. Optional privacy-friendly analytics (Plausible) can be enabled by the site operator; it sets no cookies and does not track you across sites."
+            },
+            {
+                "heading": "What we log",
+                "body": "We do not log image data or extracted schedule content. Server logs keep only the minimum needed to run the service and to enforce the daily scan limit (5 scans per day per IP address)."
+            },
+            {
+                "heading": "Your choices",
+                "body": "You can use RoutineSnap without signing up and without saving anything. If you saved local history, you can delete one scan or all of it from the History page, or clear your browser data."
+            },
+            {
+                "heading": "Contact",
+                "body": "If you have a privacy question, use the contact links on the About page."
+            }
+        ]
+    },
+    "terms": {
+        "title": "Terms of use",
+        "intro": "Plain-language terms for using RoutineSnap. If you do not agree with these terms, please do not use the service.",
+        "sections": [
+            {
+                "heading": "The service",
+                "body": "RoutineSnap turns photos of schedules into calendar events with reminders. It is provided free of charge, “as is”, without any warranty. We may change or stop the service at any time."
+            },
+            {
+                "heading": "Your responsibility",
+                "body": "Always review the extracted events before adding them to your calendar. The AI can misread a photo, especially a blurry or handwritten one. You are responsible for the events you save."
+            },
+            {
+                "heading": "Medicine schedules",
+                "body": "Medicine reminders are a convenience helper, not medical advice. Always follow your doctor's prescription. Never change a dose or stop a medicine because of what this app shows."
+            },
+            {
+                "heading": "Fair use",
+                "body": "The free tier allows 5 scans per day per IP address. Do not abuse the service, try to break it, or use it to process other people's private photos without their permission."
+            },
+            {
+                "heading": "Your content",
+                "body": "Photos you upload are processed in memory and discarded. You keep all rights to your photos and schedules. We claim no ownership over them."
+            },
+            {
+                "heading": "Liability",
+                "body": "To the extent allowed by law, we are not liable for missed classes, shifts, exams or doses, or for any loss caused by an incorrect extraction. Please double-check important dates."
+            }
+        ]
+    },
+    "about": {
+        "title": "About RoutineSnap",
+        "subtitle": "A small, privacy-first tool that turns a photo of a schedule into calendar events with reminders.",
+        "missionTitle": "Why we built it",
+        "missionBody": "Routines arrive as photos — a class routine on a notice board, a duty roster in a WhatsApp group, an exam schedule shared as a screenshot. Typing them into a calendar by hand is slow, and forgetting one means a missed class, a missed shift, or a missed dose. RoutineSnap exists so a photo becomes reminders in seconds, without signing up and without your photo ever being stored.",
+        "contactTitle": "Contact",
+        "contactBody": "RoutineSnap is made with care in Bangladesh/Japan.",
+        "contactEmpty": "No public contact email is published yet. When one is added to the site configuration, it will appear here.",
+        "builtBy": "Built by the maker of RoutineSnap"
+    },
+    "pwa": {
+        "installTitle": "Install RoutineSnap",
+        "installText": "Add RoutineSnap to your home screen for quick access — it works like an app.",
+        "installButton": "Install",
+        "dismiss": "Not now",
+        "iosTitle": "Install RoutineSnap",
+        "iosStep1": "Tap the Share button",
+        "iosStep2": "Choose “Add to Home Screen”",
+        "iosNote": "Works on iPhone and iPad — no App Store needed."
+    },
+    "offline": {
+        "title": "You're offline",
+        "body": "No internet connection right now. RoutineSnap needs the internet to read a photo, but your saved history is still here.",
+        "worksTitle": "What still works",
+        "worksHistory": "Your saved history — stored only in this browser",
+        "retry": "Try again",
+        "viewHistory": "View history"
+    }
+}

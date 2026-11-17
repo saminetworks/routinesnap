@@ -1,0 +1,31 @@
+---
+title: "Photo to calendar, privately: how RoutineSnap works"
+date: "2026-11-03"
+excerpt: "Your schedule photo is read in memory and discarded — never stored, never sold, never used to train a model. Here is exactly what happens to it."
+---
+
+A photo of your routine is personal. It can show your name, your workplace, your class, your medicine, your address on a wedding card. A tool that reads it should treat it that way. This post explains, step by step, what happens to your photo in RoutineSnap — and what never happens to it.
+
+## What happens
+
+1. **You upload a photo.** It travels to our server over an encrypted connection, exactly like any file upload.
+2. **It is read in memory.** A vision AI model reads the photo and returns structured events: titles, dates, times, rooms. The image is held in memory while this happens.
+3. **The result comes back to you.** You see the events on the confirm screen, edit them, and download your calendar file.
+4. **The photo is discarded.** As soon as your result is returned, the image and the extracted data are dropped from memory. Nothing is written to disk and there is no database to store it in.
+
+## What never happens
+
+- **No storage.** There is no server-side image storage and no database in v1. We cannot show you a photo from last week because we never kept it.
+- **No logging of content.** Server logs never contain image data or the text of your schedule. The only thing counted is the daily scan limit — five scans a day per IP address.
+- **No trackers.** RoutineSnap is cookie-free by default and uses no third-party trackers.
+- **No training.** Your photos are not used to train models.
+
+## What *is* stored, and only if you ask
+
+The one exception is local history, and it is entirely yours. If you tick "Save to local history" on the export screen, the edited events are saved in your own browser (IndexedDB). They never leave your device, and you can delete one scan or all of them from the History page — or wipe them by clearing your browser data.
+
+## Why this design
+
+Privacy is not a setting in RoutineSnap; it is the absence of a database. A feature that stores your photos would need a login, a retention policy, a deletion flow and a breach plan. By processing in memory and discarding, there is simply nothing to leak.
+
+If you want the convenience of history without the risk of a server copy, that is what the local history is for: your browser remembers, our server forgets.
