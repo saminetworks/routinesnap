@@ -331,6 +331,7 @@ describe("deep health check (?deep=1)", () => {
   const originalFetch = globalThis.fetch;
   const originalKey = process.env.ANTHROPIC_API_KEY;
   const originalModel = process.env.ANTHROPIC_MODEL;
+  const originalWorkspace = process.env.ANTHROPIC_WORKSPACE_ID;
 
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -339,6 +340,8 @@ describe("deep health check (?deep=1)", () => {
     else process.env.ANTHROPIC_API_KEY = originalKey;
     if (originalModel === undefined) delete process.env.ANTHROPIC_MODEL;
     else process.env.ANTHROPIC_MODEL = originalModel;
+    if (originalWorkspace === undefined) delete process.env.ANTHROPIC_WORKSPACE_ID;
+    else process.env.ANTHROPIC_WORKSPACE_ID = originalWorkspace;
   });
 
   it("plain response stays exactly {status, extractor} — no extra fields", async () => {
@@ -351,6 +354,7 @@ describe("deep health check (?deep=1)", () => {
 
   it("deep without a key: keyConfigured/keyValid false and no Anthropic call", async () => {
     delete process.env.ANTHROPIC_API_KEY;
+    delete process.env.ANTHROPIC_WORKSPACE_ID;
     const fetchSpy = vi.fn();
     vi.stubGlobal("fetch", fetchSpy);
     const res = await healthGET(deepRequest());
@@ -361,6 +365,8 @@ describe("deep health check (?deep=1)", () => {
       model: DEFAULT_ANTHROPIC_MODEL,
       keyConfigured: false,
       keyValid: false,
+      workspaceConfigured: false,
+      keyCheckStatus: null,
     });
     expect(fetchSpy).not.toHaveBeenCalled();
   });
@@ -383,25 +389,44 @@ describe("deep health check (?deep=1)", () => {
       model: DEFAULT_ANTHROPIC_MODEL,
       keyConfigured: true,
       keyValid: true,
+      workspaceConfigured: false,
+      keyCheckStatus: 200,
     });
     // The key itself is never returned.
     expect(JSON.stringify(body)).not.toContain("sk-ant-test-123");
   });
 
-  it("deep with a rejected key (401) reports keyValid false", async () => {
+  it("deep with a workspace id sends the header and reports it (not the value)", async () => {
+    process.env.ANTHROPIC_API_KEY = "sk-ant-test-123";
+    process.env.ANTHROPIC_WORKSPACE_ID = "wrkspc_01Test";
+    const fetchSpy = vi.fn().mockResolvedValue({ status: 200 });
+    vi.stubGlobal("fetch", fetchSpy);
+    const body = await (await healthGET(deepRequest())).json();
+    const [, init] = fetchSpy.mock.calls[0] as [string, RequestInit & { headers: Record<string, string> }];
+    expect(init.headers["anthropic-workspace-id"]).toBe("wrkspc_01Test");
+    expect(body.workspaceConfigured).toBe(true);
+    expect(body.keyCheckStatus).toBe(200);
+    // Neither secret is ever returned.
+    expect(JSON.stringify(body)).not.toContain("sk-ant-test-123");
+    expect(JSON.stringify(body)).not.toContain("wrkspc_01Test");
+  });
+
+  it("deep with a rejected key (401) reports keyValid false and the status", async () => {
     process.env.ANTHROPIC_API_KEY = "sk-ant-bad";
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ status: 401 }));
     const body = await (await healthGET(deepRequest())).json();
     expect(body.keyConfigured).toBe(true);
     expect(body.keyValid).toBe(false);
+    expect(body.keyCheckStatus).toBe(401);
     expect(JSON.stringify(body)).not.toContain("sk-ant-bad");
   });
 
-  it("deep never throws on a network error — keyValid false", async () => {
+  it("deep never throws on a network error — keyValid false, status null", async () => {
     process.env.ANTHROPIC_API_KEY = "sk-ant-test-123";
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("network down")));
     const body = await (await healthGET(deepRequest())).json();
     expect(body.keyValid).toBe(false);
+    expect(body.keyCheckStatus).toBeNull();
   });
 
   it("deep reports the configured model name via getAnthropicModel()", async () => {
