@@ -5,7 +5,9 @@ import {
   classifyExtractionError,
   extractJsonFromText,
   ExtractionError,
+  getAnthropicExtraHeaders,
   getAnthropicModel,
+  getAnthropicWorkspaceId,
   getServerExtractor,
   hasAnthropicKey,
   MAX_OUTPUT_TOKENS,
@@ -287,6 +289,36 @@ describe("mock fallback when no Anthropic key is set", () => {
     process.env.ANTHROPIC_MODEL = "claude-opus-4-1";
     expect(getAnthropicModel()).toBe("claude-opus-4-1");
     delete process.env.ANTHROPIC_MODEL;
+  });
+});
+
+describe("Anthropic workspace id header (personal/user keys)", () => {
+  const originalWorkspace = process.env.ANTHROPIC_WORKSPACE_ID;
+
+  afterEach(() => {
+    if (originalWorkspace === undefined) delete process.env.ANTHROPIC_WORKSPACE_ID;
+    else process.env.ANTHROPIC_WORKSPACE_ID = originalWorkspace;
+  });
+
+  it("sends no workspace header when ANTHROPIC_WORKSPACE_ID is unset", () => {
+    delete process.env.ANTHROPIC_WORKSPACE_ID;
+    expect(getAnthropicWorkspaceId()).toBe("");
+    expect(getAnthropicExtraHeaders()).toEqual({});
+  });
+
+  it("sends anthropic-workspace-id when the workspace id is set", () => {
+    process.env.ANTHROPIC_WORKSPACE_ID = "wrkspc_01Test";
+    expect(getAnthropicWorkspaceId()).toBe("wrkspc_01Test");
+    expect(getAnthropicExtraHeaders()).toEqual({
+      "anthropic-workspace-id": "wrkspc_01Test",
+    });
+  });
+
+  it("trims whitespace around the workspace id", () => {
+    process.env.ANTHROPIC_WORKSPACE_ID = "  wrkspc_01Test  ";
+    expect(getAnthropicExtraHeaders()).toEqual({
+      "anthropic-workspace-id": "wrkspc_01Test",
+    });
   });
 });
 

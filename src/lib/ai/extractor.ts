@@ -229,6 +229,23 @@ export function hasAnthropicKey(): boolean {
 }
 
 /**
+ * Workspace id for personal/user API keys (sk-ant-usr-...). Anthropic
+ * rejects those keys unless every request also sends the workspace id
+ * as an `anthropic-workspace-id` header (400 otherwise). Workspace keys
+ * (sk-ant-api03-...) are already scoped and do not need it, so the
+ * header is only sent when this env var is set.
+ */
+export function getAnthropicWorkspaceId(): string {
+  return process.env.ANTHROPIC_WORKSPACE_ID?.trim() || "";
+}
+
+/** Extra headers for Anthropic requests: workspace id when configured. */
+export function getAnthropicExtraHeaders(): Record<string, string> {
+  const workspaceId = getAnthropicWorkspaceId();
+  return workspaceId ? { "anthropic-workspace-id": workspaceId } : {};
+}
+
+/**
  * Pull a JSON object out of model text. The model is told to return
  * JSON only, but it sometimes wraps it in ```json fences or adds a
  * short preamble — tolerate that, never log the content.
@@ -274,7 +291,10 @@ export class AnthropicExtractor implements ScheduleExtractor {
       referenceDate: input.referenceDate,
     });
     const { default: Anthropic } = await import("@anthropic-ai/sdk");
-    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+    const client = new Anthropic({
+      apiKey: process.env.ANTHROPIC_API_KEY,
+      defaultHeaders: getAnthropicExtraHeaders(),
+    });
     const userContent: Anthropic.MessageParam["content"] = [
       {
         type: "image",

@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { getAnthropicModel, hasAnthropicKey } from "@/lib/ai/extractor";
+import { getAnthropicExtraHeaders, getAnthropicModel, hasAnthropicKey } from "@/lib/ai/extractor";
 
 const ANTHROPIC_MODELS_URL = "https://api.anthropic.com/v1/models";
 /** Cheap key check must stay fast — the health endpoint is not a scan. */
@@ -21,6 +21,7 @@ async function checkAnthropicKeyValid(): Promise<boolean> {
       headers: {
         "x-api-key": apiKey,
         "anthropic-version": "2023-06-01",
+        ...getAnthropicExtraHeaders(),
       },
       signal: AbortSignal.timeout(KEY_CHECK_TIMEOUT_MS),
     });

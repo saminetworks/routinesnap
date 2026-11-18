@@ -1,5 +1,5 @@
 import { addDays, format } from "date-fns";
-import { fromZonedTime } from "date-fns-tz";
+import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
 import type { EditableEvent } from "@/lib/ai/schema";
 import { combineDateTime, crossesMidnight, resolveEventDate } from "@/lib/dates";
 
@@ -9,9 +9,14 @@ export interface CalendarLinkOptions {
   repeatUntil?: Date;
 }
 
-/** Format a Date as UTC `YYYYMMDDTHHMMSSZ` for Google Calendar URLs. */
+/**
+ * Format a Date as UTC `YYYYMMDDTHHMMSSZ` for Google Calendar URLs.
+ * Must format in UTC explicitly: date-fns `format` uses the server's
+ * local timezone, so on a non-UTC machine (e.g. a self-hosted server
+ * in Asia/Dhaka or JST) the times would be hours off despite the `Z`.
+ */
 function toGoogleDate(date: Date): string {
-  return format(date, "yyyyMMdd'T'HHmmss'Z'");
+  return formatInTimeZone(date, "UTC", "yyyyMMdd'T'HHmmss'Z'");
 }
 
 function eventStartEnd(
