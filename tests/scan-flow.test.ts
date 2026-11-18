@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, afterEach } from "vitest";
 import { MockExtractor } from "@/lib/ai/extractor";
+import { getServerTextExtractor } from "@/lib/ai/extract-text";
 import { generateIcs } from "@/lib/ics";
 
 /**
@@ -68,5 +69,32 @@ describe("mock extract -> .ics", () => {
     expect(ics.match(/BEGIN:VALARM/g)).toHaveLength(6);
     expect(ics).toContain("TRIGGER:-P1D");
     expect(ics).toContain("TRIGGER:-PT2H");
+  });
+});
+
+describe("pasted text -> .ics (same confirm/export flow as photo)", () => {
+  const originalKey = process.env.ANTHROPIC_API_KEY;
+
+  afterEach(() => {
+    if (originalKey === undefined) delete process.env.ANTHROPIC_API_KEY;
+    else process.env.ANTHROPIC_API_KEY = originalKey;
+  });
+
+  it("mock text extraction feeds the same .ics export", async () => {
+    delete process.env.ANTHROPIC_API_KEY;
+    const result = await getServerTextExtractor().extractText({
+      text: "Monday Physics 09:00-10:00 Room 204",
+      category: "class-routine",
+      locale: "en",
+      timezone: "Asia/Dhaka",
+      referenceDate: "2026-11-16",
+    });
+    const ics = generateIcs(result.events, {
+      weekStart: new Date("2026-11-16T00:00:00"),
+      timezone: "Asia/Dhaka",
+      repeatUntil: new Date("2027-02-08T00:00:00"),
+    });
+    expect(ics.match(/BEGIN:VEVENT/g)).toHaveLength(5);
+    expect(ics).toContain("SUMMARY:Physics");
   });
 });

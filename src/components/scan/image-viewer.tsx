@@ -17,8 +17,13 @@ interface ImageViewerProps {
  * The image is fit to the container width at 100% zoom (width: 100%),
  * so the whole routine is visible on first paint. Zoom scales from that
  * fitted view: 100% = fit, 200% = twice the fitted width (scrollable),
- * 50% = half. Rotation is done on the pixels by the parent (rotateDataUrl),
- * never as a CSS transform here, so what you see is what gets uploaded.
+ * 50% = half. The <img> is never cropped and always keeps its aspect
+ * ratio: width is a percentage of the container, height is auto, and
+ * object-contain + max-w-none make that explicit (Tailwind's preflight
+ * caps img at max-width: 100%, which would otherwise pin zoom at 100%).
+ * Rotation is done on the pixels by the parent (rotateDataUrl), never as
+ * a CSS transform here, so what you see is what gets uploaded: the
+ * preview renders image.dataUrl, the exact bytes the extractor sends.
  */
 export function ImageViewer({ dataUrl, onRotate, onReplace }: ImageViewerProps) {
   const t = useTranslations("scan");
@@ -68,8 +73,8 @@ export function ImageViewer({ dataUrl, onRotate, onReplace }: ImageViewerProps) 
         <img
           src={dataUrl}
           alt={t("imageAlt")}
-          className="mx-auto block h-auto rounded-[10px]"
-          style={{ width: `${zoom * 100}%` }}
+          className="mx-auto block h-auto max-w-none rounded-[10px] object-contain"
+          style={{ width: `${zoom * 100}%`, height: "auto", maxWidth: "none" }}
         />
       </div>
     </figure>

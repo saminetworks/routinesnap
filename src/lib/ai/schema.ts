@@ -55,7 +55,13 @@ export const extractResultSchema = z.object({
   language: z.enum(["bn", "en", "ja", "mixed"]),
   assumptions: z.array(z.string()),
   warnings: z.array(z.string()),
-  events: z.array(extractedEventSchema).min(1),
+  // An empty list is valid: the prompt tells the model to return
+  // events: [] (with a warning) when the image holds no readable
+  // schedule. The scan UI already handles zero events — EventsEditor
+  // shows its "no events" state and ExportBar disables every export
+  // button — so an empty result reaches the user as a friendly
+  // "nothing found" instead of a 502.
+  events: z.array(extractedEventSchema),
 });
 export type ExtractResult = z.infer<typeof extractResultSchema>;
 

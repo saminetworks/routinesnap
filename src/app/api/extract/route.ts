@@ -1,6 +1,10 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { categoryInputSchema } from "@/lib/ai/schema";
-import { getServerExtractor } from "@/lib/ai/extractor";
+import {
+  classifyExtractionError,
+  getServerExtractor,
+  type ExtractionErrorCode,
+} from "@/lib/ai/extractor";
 import { MAX_IMAGE_BYTES } from "@/lib/image";
 import { checkRateLimit, getClientIp, getDailyScanLimit } from "@/lib/rate-limit";
 
@@ -120,12 +124,30 @@ export async function POST(request: NextRequest) {
     });
     return NextResponse.json(result, { headers: rateHeaders });
   } catch (err) {
-    // Friendly error only — no stack traces, no image data, no content.
-    console.error("[extract] extraction failed:", err instanceof Error ? err.name : "unknown");
+    // Classify the failure so the response (and the Vercel log line)
+    // says what actually happened: an Anthropic outage/rate limit,
+    // a model reply that never became valid JSON, or anything else.
+    // The log line carries only the failure kind and a content-free
+    // detail — no image data, no extracted text, no stack traces.
+    const failure = classifyExtractionError(err);
+    console.error(`[extract] ${failure.code}: ${failure.logDetail}`);
     return errorResponse(
-      502,
-      "extraction_failed",
-      "We couldn't read that photo. Please try a clearer photo and try again.",
+      failure.httpStatus,
+      failure.code,
+      extractionErrorMessage(failure.code),
     );
+  }
+}
+
+/** Friendly, content-free message per failure kind. */
+function extractionErrorMessage(code: ExtractionErrorCode): string {
+  switch (code) {
+    case "ai_unavailable":
+      return "Our AI service is busy right now. Please try again in a minute.";
+    case "invalid_output":
+      return "We couldn't make sense of the schedule in that photo. Please try a clearer photo or a closer crop.";
+    case "extraction_failed":
+    default:
+      return "We couldn't read that photo. Please try a clearer photo and try again.";
   }
 }

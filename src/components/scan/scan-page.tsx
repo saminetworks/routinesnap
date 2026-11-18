@@ -10,12 +10,21 @@ import { Dropzone } from "@/components/scan/dropzone";
 import { EventsEditor } from "@/components/scan/events-editor";
 import { ExportBar } from "@/components/scan/export-bar";
 import { ImageViewer } from "@/components/scan/image-viewer";
+import { ScanDebugPanel, type LastExtractInfo } from "@/components/scan/debug-panel";
+import { SnapHelper } from "@/components/scan/snap-helper";
 import type { CategoryLocale } from "@/config/categories";
 import { getCategory } from "@/config/categories";
 import { createExtractor, ApiExtractError } from "@/lib/ai/extractor";
-import { toEditableEvents, type CategoryInput, type EditableEvent, type ExtractResult } from "@/lib/ai/schema";
+import {
+  extractResultSchema,
+  toEditableEvents,
+  type CategoryInput,
+  type EditableEvent,
+  type ExtractResult,
+} from "@/lib/ai/schema";
 import { defaultRepeatUntil, formatDateInput, nextMonday } from "@/lib/dates";
 import { rotateDataUrl, type ProcessedImage } from "@/lib/image";
+import { analyzePhotoQuality, type PhotoQuality } from "@/lib/photo-quality";
 import { cn } from "@/lib/utils";
 
 type Step = "upload" | "extracting" | "confirm";
@@ -52,12 +61,53 @@ export function ScanPage() {
   const [toast, setToast] = useState<{ message: string; undo: boolean } | null>(null);
   const [lastDeleted, setLastDeleted] = useState<DeletedSnapshot | null>(null);
   const toastTimer = useRef<number | null>(null);
+  // Part B: quality signals for the current photo (never blocks extraction).
+  const [quality, setQuality] = useState<PhotoQuality | null>(null);
+  // Guards the async quality check against a fast image replace.
+  const qualityFor = useRef<string | null>(null);
+  // Part D: last /api/extract response (status + error code) for the debug panel.
+  // NOTE: the photo path goes through ApiExtractor, which carries the
+  // error code but not the HTTP status, so status is null on photo
+  // failures (the text path sets it from the fetch response).
+  const [lastExtract, setLastExtract] = useState<LastExtractInfo | null>(null);
+  // Part D: /api/health?deep=1, fetched once on load in debug mode only.
+  const [health, setHealth] = useState<{ model?: string; extractor?: string } | null>(null);
+  // Part C: snap helper state.
+  const [helperOpen, setHelperOpen] = useState(false);
+  const [helperErrorCode, setHelperErrorCode] = useState<string | null>(null);
+  const [helperTipsOpen, setHelperTipsOpen] = useState(false);
+  // Part C: paste-as-text tab.
+  const [inputTab, setInputTab] = useState<"photo" | "text">("photo");
+  const [pasteText, setPasteText] = useState("");
+  const [lastMode, setLastMode] = useState<"photo" | "text">("photo");
 
   // ?category=slug deep link (e.g. from /templates/[slug] in Step 6).
   useEffect(() => {
     const slug = searchParams.get("category");
     if (slug && getCategory(slug)) setCategory(slug as CategoryInput);
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Debug mode only: fetch /api/health?deep=1 once on load for the
+  // debug panel's model + extractor rows. Tolerates missing fields.
+  useEffect(() => {
+    if (process.env.NEXT_PUBLIC_DEBUG !== "1") return;
+    let cancelled = false;
+    fetch("/api/health?deep=1")
+      .then((res) => res.json())
+      .then((body: { model?: unknown; extractor?: unknown }) => {
+        if (cancelled) return;
+        setHealth({
+          model: typeof body.model === "string" ? body.model : undefined,
+          extractor: typeof body.extractor === "string" ? body.extractor : undefined,
+        });
+      })
+      .catch(() => {
+        // Health is debug-only decoration; a failed fetch changes nothing.
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const extractingMessages = useMemo(() => {
@@ -83,12 +133,29 @@ export function ScanPage() {
 
   const isMedicine = result?.detectedCategory === "medicine-schedule";
 
+  /** Shared success path for photo and text extraction: same confirm/edit flow. */
+  const applyExtractResult = (extracted: ExtractResult) => {
+    const reminder = defaultReminder === "" ? undefined : [Number(defaultReminder)];
+    setResult(extracted);
+    setEvents(
+      toEditableEvents(extracted.events).map((e) => ({
+        ...e,
+        reminderMinutesBefore: e.reminderMinutesBefore ?? reminder,
+      })),
+    );
+    setMedicineVerified(false);
+    setExported(false);
+    setStep("confirm");
+  };
+
   const extract = async () => {
     if (!image) {
       setError(t("noImage"));
       return;
     }
     setError(null);
+    setHelperOpen(false);
+    setLastMode("photo");
     setStep("extracting");
     setExtractMsg(0);
     try {
@@ -99,29 +166,146 @@ export function ScanPage() {
         timezone,
         referenceDate: new Date().toISOString().slice(0, 10),
       });
-      const reminder = defaultReminder === "" ? undefined : [Number(defaultReminder)];
-      setResult(extracted);
-      setEvents(
-        toEditableEvents(extracted.events).map((e) => ({
-          ...e,
-          reminderMinutesBefore: e.reminderMinutesBefore ?? reminder,
-        })),
-      );
-      setMedicineVerified(false);
-      setExported(false);
-      setStep("confirm");
+      setLastExtract({ status: 200, code: null });
+      applyExtractResult(extracted);
     } catch (err) {
       // The API returns machine-readable codes; show a friendly,
       // translated message for each instead of the raw error.
+      let code: string | null = null;
       if (err instanceof ApiExtractError) {
+        code = err.code;
         if (err.code === "rate_limited") setError(t("rateLimited"));
         else if (err.code === "invalid_image") setError(t("invalidImage"));
+        else if (err.code === "ai_unavailable") setError(t("aiUnavailable"));
+        else if (err.code === "invalid_output") setError(t("invalidOutput"));
         else setError(t("serverError"));
       } else {
+        code = "extractError";
         setError(t("extractError"));
       }
+      setLastExtract({ status: null, code });
+      // The snap helper opens automatically on failure, with the real
+      // error code + the photo-quality signals for its explanation.
+      setHelperErrorCode(code);
+      setHelperOpen(true);
       setStep("upload");
     }
+  };
+
+  /** Paste-as-text submit: POSTs to /api/extract-text and feeds the
+   * result into the SAME confirm/edit flow as photo extraction. */
+  const submitText = async () => {
+    if (pasteText.trim().length === 0) {
+      setError(t("pasteEmpty"));
+      return;
+    }
+    setError(null);
+    setHelperOpen(false);
+    setLastMode("text");
+    setStep("extracting");
+    setExtractMsg(0);
+    try {
+      const res = await fetch("/api/extract-text", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          text: pasteText,
+          category,
+          locale,
+          timezone,
+          referenceDate: new Date().toISOString().slice(0, 10),
+        }),
+      });
+      const body = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        message?: string;
+        retryAfterSeconds?: number;
+      } & Partial<ExtractResult>;
+      if (!res.ok) {
+        const code = body.error ?? "extraction_failed";
+        setLastExtract({ status: res.status, code });
+        if (code === "rate_limited") setError(t("rateLimited"));
+        else if (code === "ai_unavailable") setError(t("aiUnavailable"));
+        else if (code === "invalid_output") setError(t("invalidOutput"));
+        else setError(t("serverError"));
+        setHelperErrorCode(code);
+        setHelperOpen(true);
+        setStep("upload");
+        return;
+      }
+      setLastExtract({ status: res.status, code: null });
+      applyExtractResult(extractResultSchema.parse(body));
+    } catch {
+      setLastExtract({ status: null, code: "extractError" });
+      setError(t("extractError"));
+      setHelperErrorCode("extractError");
+      setHelperOpen(true);
+      setStep("upload");
+    }
+  };
+
+  /** "Try again" from the snap helper re-runs whichever mode failed last. */
+  const retryLast = () => {
+    setHelperOpen(false);
+    if (lastMode === "text") void submitText();
+    else void extract();
+  };
+
+  /** One blank editable event row (same shape as EventsEditor's Add event). */
+  const blankManualEvent = (): EditableEvent => ({
+    id: `evt-manual-${Date.now().toString(36)}`,
+    title: "",
+    date: startDate,
+    startTime: "09:00",
+    endTime: "10:00",
+    reminderMinutesBefore: [30],
+    confidence: 1,
+    selected: true,
+  });
+
+  /**
+   * "Add events manually" from the snap helper. The confirm step's
+   * editor already has its own Add event button, so when a result
+   * exists we just go there. When extraction failed and there is no
+   * result yet, seed a blank result + one blank editable event so
+   * the user can type events in instead of being stuck.
+   */
+  const handleManualAdd = () => {
+    setHelperOpen(false);
+    setHelperTipsOpen(false);
+    if (result) {
+      setStep("confirm");
+      return;
+    }
+    setResult({
+      detectedCategory: category === "auto" ? "class-routine" : category,
+      language: "mixed",
+      assumptions: [],
+      warnings: [],
+      events: [],
+    });
+    setEvents([blankManualEvent()]);
+    setMedicineVerified(false);
+    setExported(false);
+    setStep("confirm");
+  };
+
+  /** Retake: clear the photo (and its quality signals) back to upload. */
+  const clearImage = () => {
+    setImage(null);
+    setQuality(null);
+    qualityFor.current = null;
+  };
+
+  /** Photo picked: store it, then check quality async — never blocks the extract button. */
+  const handleImage = (img: ProcessedImage) => {
+    setImage(img);
+    setError(null);
+    setQuality(null);
+    qualityFor.current = img.dataUrl;
+    void analyzePhotoQuality(img.dataUrl).then((q) => {
+      if (qualityFor.current === img.dataUrl) setQuality(q);
+    });
   };
 
   const handleRotate = async (degrees: 90 | -90) => {
@@ -160,11 +344,18 @@ export function ScanPage() {
   const resetAll = () => {
     setStep("upload");
     setImage(null);
+    setQuality(null);
+    qualityFor.current = null;
     setResult(null);
     setEvents([]);
     setMedicineVerified(false);
     setExported(false);
     setError(null);
+    setHelperOpen(false);
+    setHelperErrorCode(null);
+    setHelperTipsOpen(false);
+    setPasteText("");
+    setInputTab("photo");
   };
 
   const weekStart = useMemo(() => new Date(`${startDate}T00:00:00`), [startDate]);
@@ -211,20 +402,73 @@ export function ScanPage() {
 
       {step === "upload" && (
         <section className="mt-6 space-y-6">
-          <Dropzone
-            onImage={(img) => {
-              setImage(img);
-              setError(null);
-            }}
-            onError={setError}
-          />
-          {image && (
-            <ImageViewer dataUrl={image.dataUrl} onRotate={handleRotate} onReplace={() => setImage(null)} />
+          <div className="flex gap-2" role="tablist" aria-label="Input type">
+            {(["photo", "text"] as const).map((tab) => (
+              <button
+                key={tab}
+                role="tab"
+                aria-selected={inputTab === tab}
+                onClick={() => setInputTab(tab)}
+                className={cn(
+                  "min-h-11 flex-1 rounded-[12px] border px-3 text-sm font-medium sm:flex-none sm:px-5",
+                  inputTab === tab ? "border-primary bg-primary/10" : "border-border bg-card text-muted-foreground",
+                )}
+              >
+                {tab === "photo" ? t("pasteTabPhoto") : t("pasteTabText")}
+              </button>
+            ))}
+          </div>
+
+          {inputTab === "photo" && (
+            <>
+              <Dropzone onImage={handleImage} onError={setError} />
+              {image && (
+                <ImageViewer dataUrl={image.dataUrl} onRotate={handleRotate} onReplace={clearImage} />
+              )}
+              {image && quality && !quality.unknown && (quality.dark || quality.blurry || quality.glare) && (
+                <div role="status" className="flex flex-wrap items-start gap-3 rounded-[16px] border border-warning/50 bg-warning/10 p-4">
+                  <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warning" aria-hidden />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold text-warning">{t("qualityTitle")}</p>
+                    <ul className="mt-1 list-disc space-y-0.5 pl-5 text-sm text-muted-foreground">
+                      {quality.dark && <li>{t("qualityDark")}</li>}
+                      {quality.blurry && <li>{t("qualityBlurry")}</li>}
+                      {quality.glare && <li>{t("qualityGlare")}</li>}
+                    </ul>
+                  </div>
+                  <Button type="button" variant="secondary" size="sm" onClick={clearImage}>
+                    {t("qualityRetake")}
+                  </Button>
+                </div>
+              )}
+              <p className="flex items-center gap-2 text-sm text-muted-foreground">
+                <ShieldCheck className="size-4 shrink-0 text-success" aria-hidden />
+                {t("privacy")}
+              </p>
+              <Button type="button" size="lg" className="w-full sm:w-auto" disabled={!image} onClick={extract}>
+                {t("extract")}
+              </Button>
+            </>
           )}
-          <p className="flex items-center gap-2 text-sm text-muted-foreground">
-            <ShieldCheck className="size-4 shrink-0 text-success" aria-hidden />
-            {t("privacy")}
-          </p>
+
+          {inputTab === "text" && (
+            <div className="space-y-3">
+              <label htmlFor="paste-text" className="block text-sm font-medium">
+                {t("pasteLabel")}
+              </label>
+              <textarea
+                id="paste-text"
+                value={pasteText}
+                onChange={(e) => setPasteText(e.target.value)}
+                placeholder={t("pastePlaceholder")}
+                rows={8}
+                className="w-full rounded-[12px] border border-input bg-background px-3 py-2 text-sm"
+              />
+              <Button type="button" size="lg" className="w-full sm:w-auto" onClick={submitText}>
+                {t("pasteSubmit")}
+              </Button>
+            </div>
+          )}
 
           <div className="rounded-[16px] border border-border bg-card p-4 sm:p-5">
             <CategoryPicker value={category} onChange={setCategory} locale={locale} />
@@ -280,9 +524,11 @@ export function ScanPage() {
             </div>
           </div>
 
-          <Button type="button" size="lg" className="w-full sm:w-auto" disabled={!image} onClick={extract}>
-            {t("extract")}
-          </Button>
+          <div>
+            <Button type="button" variant="secondary" onClick={() => setHelperOpen(true)}>
+              {t("needHelp")}
+            </Button>
+          </div>
         </section>
       )}
 
@@ -301,15 +547,16 @@ export function ScanPage() {
         </section>
       )}
 
-      {step === "confirm" && result && image && (
+      {step === "confirm" && result && (
         <section className="mt-6 space-y-6">
           <Button type="button" variant="ghost" onClick={() => setStep("upload")}>
             <ArrowLeft aria-hidden />
             {t("backToUpload")}
           </Button>
 
-          <div className="flex gap-2 lg:hidden" role="tablist" aria-label="Confirm view">
-            {(["photo", "events"] as const).map((tab) => (
+          {image && (
+            <div className="flex gap-2 lg:hidden" role="tablist" aria-label="Confirm view">
+              {(["photo", "events"] as const).map((tab) => (
               <button
                 key={tab}
                 role="tab"
@@ -322,13 +569,16 @@ export function ScanPage() {
               >
                 {tab === "photo" ? t("photoTab") : t("eventsTab")}
               </button>
-            ))}
-          </div>
-
-          <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
-            <div className={cn(mobileTab === "photo" ? "block" : "hidden", "lg:block")}>
-              <ImageViewer dataUrl={image.dataUrl} onRotate={handleRotate} onReplace={() => { setImage(null); setStep("upload"); }} />
+              ))}
             </div>
+          )}
+
+          <div className={cn("grid gap-6 lg:items-start", image && "lg:grid-cols-2")}>
+            {image && (
+              <div className={cn(mobileTab === "photo" ? "block" : "hidden", "lg:block")}>
+                <ImageViewer dataUrl={image.dataUrl} onRotate={handleRotate} onReplace={() => { clearImage(); setStep("upload"); }} />
+              </div>
+            )}
             <div className={cn(mobileTab === "events" ? "block" : "hidden", "lg:block")}>
               <EventsEditor
                 events={events}
@@ -359,6 +609,68 @@ export function ScanPage() {
           />
         </section>
       )}
+
+      <SnapHelper
+        open={helperOpen}
+        errorCode={helperErrorCode}
+        quality={quality}
+        tipsOpen={helperTipsOpen}
+        onRetake={() => {
+          clearImage();
+          setHelperOpen(false);
+          setHelperTipsOpen(false);
+          setStep("upload");
+        }}
+        onShowTips={() => setHelperTipsOpen((v) => !v)}
+        onRetry={retryLast}
+        onManualAdd={handleManualAdd}
+        onClose={() => setHelperOpen(false)}
+        labels={{
+          title: t("helper.title"),
+          close: t("helper.close"),
+          reasonRateLimited: t("helper.reasonRateLimited"),
+          reasonInvalidImage: t("helper.reasonInvalidImage"),
+          reasonAiUnavailable: t("helper.reasonAiUnavailable"),
+          reasonInvalidOutput: t("helper.reasonInvalidOutput"),
+          reasonPhotoQuality: t("helper.reasonPhotoQuality"),
+          reasonUnknown: t("helper.reasonUnknown"),
+          qualityNoteDark: t("qualityDark"),
+          qualityNoteBlurry: t("qualityBlurry"),
+          qualityNoteGlare: t("qualityGlare"),
+          tipsTitle: t("helper.tipsTitle"),
+          tips: [
+            t("helper.tip1"),
+            t("helper.tip2"),
+            t("helper.tip3"),
+            t("helper.tip4"),
+            t("helper.tip5"),
+          ],
+          retake: t("helper.retake"),
+          showTips: t("helper.showTips"),
+          hideTips: t("helper.hideTips"),
+          retry: t("helper.retry"),
+          manualAdd: t("helper.manualAdd"),
+        }}
+      />
+
+      <ScanDebugPanel
+        image={image}
+        processing={image ? (image.sentAsIs ? "sent-as-is" : "processed") : undefined}
+        lastExtract={lastExtract}
+        model={health?.model}
+        extractor={health?.extractor}
+        labels={{
+          title: t("debug.title"),
+          imageSize: t("debug.imageSize"),
+          fileType: t("debug.fileType"),
+          processing: t("debug.processing"),
+          lastExtract: t("debug.lastExtract"),
+          model: t("debug.model"),
+          extractor: t("debug.extractor"),
+          sentAsIs: t("debug.sentAsIs"),
+          processed: t("debug.processed"),
+        }}
+      />
 
       {toast && (
         <div

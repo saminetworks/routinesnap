@@ -1,9 +1,14 @@
-import { describe, expect, it, beforeEach } from "vitest";
+import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
+import type { NextRequest } from "next/server";
+import { GET as healthGET } from "@/app/api/health/route";
 import {
+  classifyExtractionError,
   extractJsonFromText,
+  ExtractionError,
   getAnthropicModel,
   getServerExtractor,
   hasAnthropicKey,
+  MAX_OUTPUT_TOKENS,
   MockExtractor,
   DEFAULT_ANTHROPIC_MODEL,
 } from "@/lib/ai/extractor";
@@ -65,9 +70,12 @@ describe("ExtractResult Zod schema", () => {
     ).toThrow();
   });
 
-  it("rejects an unknown category and an empty events list", () => {
+  it("rejects an unknown category but accepts an empty events list", () => {
     expect(() => extractResultSchema.parse({ ...validResult, detectedCategory: "other" })).toThrow();
-    expect(() => extractResultSchema.parse({ ...validResult, events: [] })).toThrow();
+    // Empty is valid: the prompt tells the model to return events: []
+    // when the image holds no readable schedule, and the scan UI
+    // already renders that as a friendly "nothing found" state.
+    expect(extractResultSchema.parse({ ...validResult, events: [] }).events).toHaveLength(0);
   });
 
   it("rejects a bad date format", () => {
@@ -95,6 +103,84 @@ describe("extractJsonFromText", () => {
 
   it("throws when there is no JSON object", () => {
     expect(() => extractJsonFromText("no json here")).toThrow();
+  });
+
+  it("parses fenced JSON with a preamble and trailing text", () => {
+    expect(
+      extractJsonFromText(
+        'Here is the extracted schedule:\n```json\n{"a": 1, "b": {"c": [1, 2]}}\n```\nLet me know if you need anything else.',
+      ),
+    ).toEqual({ a: 1, b: { c: [1, 2] } });
+  });
+
+  it("throws on truncated JSON (unclosed object) so the retry path runs", () => {
+    // A reply cut off by the output limit has no closing brace.
+    expect(() => extractJsonFromText('{"events": [{"title": "Physics", "confidence": 0.9')).toThrow();
+    expect(() =>
+      extractJsonFromText('```json\n{"events": [{"title": "Physics"'),
+    ).toThrow();
+  });
+
+  it("finds the JSON object inside surrounding prose", () => {
+    expect(extractJsonFromText('Sure! {"a": {"b": 2}} done.')).toEqual({ a: { b: 2 } });
+  });
+});
+
+describe("extraction failure classification", () => {
+  it("uses a large output budget so full weekly tables are not truncated", () => {
+    expect(MAX_OUTPUT_TOKENS).toBe(8192);
+  });
+
+  it("maps Anthropic server errors and overload to ai_unavailable (503)", () => {
+    for (const status of [500, 502, 529]) {
+      const err = new Error(`Anthropic ${status}`) as Error & { status: number };
+      err.status = status;
+      const classified = classifyExtractionError(err);
+      expect(classified).toBeInstanceOf(ExtractionError);
+      expect(classified.code).toBe("ai_unavailable");
+      expect(classified.httpStatus).toBe(503);
+    }
+  });
+
+  it("maps Anthropic rate limiting to ai_unavailable (503)", () => {
+    const err = new Error("rate limited") as Error & { status: number };
+    err.status = 429;
+    const classified = classifyExtractionError(err);
+    expect(classified.code).toBe("ai_unavailable");
+    expect(classified.httpStatus).toBe(503);
+  });
+
+  it("keeps auth failures on the generic code (key problem, not a photo problem)", () => {
+    for (const status of [401, 403]) {
+      const err = new Error("auth") as Error & { status: number };
+      err.status = status;
+      const classified = classifyExtractionError(err);
+      expect(classified.code).toBe("extraction_failed");
+      expect(classified.httpStatus).toBe(502);
+      expect(classified.logDetail).toContain("anthropic_auth");
+    }
+  });
+
+  it("passes ExtractionErrors through unchanged", () => {
+    const original = new ExtractionError("invalid_output", 502, "model_output_invalid_after_retry");
+    expect(classifyExtractionError(original)).toBe(original);
+  });
+
+  it("falls back to the generic code for unknown errors, logged by name only", () => {
+    const classified = classifyExtractionError(new TypeError("boom"));
+    expect(classified.code).toBe("extraction_failed");
+    expect(classified.httpStatus).toBe(502);
+    expect(classified.logDetail).toBe("TypeError");
+    expect(classified.logDetail).not.toContain("boom");
+  });
+
+  it("base rules tell the model to return events: [] when nothing is readable", async () => {
+    const prompt = await getSystemPrompt("class-routine", {
+      locale: "en",
+      timezone: "Asia/Dhaka",
+      referenceDate: "2026-11-17",
+    });
+    expect(prompt).toContain("events: []");
   });
 });
 
@@ -201,5 +287,96 @@ describe("mock fallback when no Anthropic key is set", () => {
     process.env.ANTHROPIC_MODEL = "claude-opus-4-1";
     expect(getAnthropicModel()).toBe("claude-opus-4-1");
     delete process.env.ANTHROPIC_MODEL;
+  });
+});
+
+describe("deep health check (?deep=1)", () => {
+  /** Minimal stand-in for a NextRequest — only nextUrl is read. */
+  const requestFor = (url: string) =>
+    ({ nextUrl: new URL(url) }) as unknown as NextRequest;
+  const deepRequest = () => requestFor("http://localhost/api/health?deep=1");
+
+  const originalFetch = globalThis.fetch;
+  const originalKey = process.env.ANTHROPIC_API_KEY;
+  const originalModel = process.env.ANTHROPIC_MODEL;
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    globalThis.fetch = originalFetch;
+    if (originalKey === undefined) delete process.env.ANTHROPIC_API_KEY;
+    else process.env.ANTHROPIC_API_KEY = originalKey;
+    if (originalModel === undefined) delete process.env.ANTHROPIC_MODEL;
+    else process.env.ANTHROPIC_MODEL = originalModel;
+  });
+
+  it("plain response stays exactly {status, extractor} — no extra fields", async () => {
+    delete process.env.ANTHROPIC_API_KEY;
+    const res = await healthGET(requestFor("http://localhost/api/health"));
+    const body = await res.json();
+    expect(body).toEqual({ status: "ok", extractor: "mock" });
+    expect(Object.keys(body).sort()).toEqual(["extractor", "status"]);
+  });
+
+  it("deep without a key: keyConfigured/keyValid false and no Anthropic call", async () => {
+    delete process.env.ANTHROPIC_API_KEY;
+    const fetchSpy = vi.fn();
+    vi.stubGlobal("fetch", fetchSpy);
+    const res = await healthGET(deepRequest());
+    const body = await res.json();
+    expect(body).toEqual({
+      status: "ok",
+      extractor: "mock",
+      model: DEFAULT_ANTHROPIC_MODEL,
+      keyConfigured: false,
+      keyValid: false,
+    });
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("deep with a valid key: GETs /v1/models with the key header, keyValid true", async () => {
+    process.env.ANTHROPIC_API_KEY = "sk-ant-test-123";
+    const fetchSpy = vi.fn().mockResolvedValue({ status: 200 });
+    vi.stubGlobal("fetch", fetchSpy);
+    const body = await (await healthGET(deepRequest())).json();
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchSpy.mock.calls[0] as [string, RequestInit & { headers: Record<string, string> }];
+    expect(url).toBe("https://api.anthropic.com/v1/models");
+    expect(init.headers["x-api-key"]).toBe("sk-ant-test-123");
+    expect(init.headers["anthropic-version"]).toBe("2023-06-01");
+    expect(init.signal).toBeInstanceOf(AbortSignal);
+
+    expect(body).toEqual({
+      status: "ok",
+      extractor: "anthropic",
+      model: DEFAULT_ANTHROPIC_MODEL,
+      keyConfigured: true,
+      keyValid: true,
+    });
+    // The key itself is never returned.
+    expect(JSON.stringify(body)).not.toContain("sk-ant-test-123");
+  });
+
+  it("deep with a rejected key (401) reports keyValid false", async () => {
+    process.env.ANTHROPIC_API_KEY = "sk-ant-bad";
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ status: 401 }));
+    const body = await (await healthGET(deepRequest())).json();
+    expect(body.keyConfigured).toBe(true);
+    expect(body.keyValid).toBe(false);
+    expect(JSON.stringify(body)).not.toContain("sk-ant-bad");
+  });
+
+  it("deep never throws on a network error — keyValid false", async () => {
+    process.env.ANTHROPIC_API_KEY = "sk-ant-test-123";
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("network down")));
+    const body = await (await healthGET(deepRequest())).json();
+    expect(body.keyValid).toBe(false);
+  });
+
+  it("deep reports the configured model name via getAnthropicModel()", async () => {
+    process.env.ANTHROPIC_API_KEY = "sk-ant-test-123";
+    process.env.ANTHROPIC_MODEL = "claude-opus-4-1";
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ status: 200 }));
+    const body = await (await healthGET(deepRequest())).json();
+    expect(body.model).toBe("claude-opus-4-1");
   });
 });

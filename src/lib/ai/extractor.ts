@@ -134,6 +134,92 @@ function responseText(content: Anthropic.ContentBlock[]): string {
 }
 export const DEFAULT_ANTHROPIC_MODEL = "claude-sonnet-4-5";
 
+/** Output budget for a single model reply. Raised from 4096: a full
+ * weekly table (11+ events with long titles, rooms and notes) plus
+ * warnings/assumptions can run past 4096 tokens, which truncated the
+ * JSON mid-object — unparseable on both the first call and the retry,
+ * so every such photo failed with a 502. */
+export const MAX_OUTPUT_TOKENS = 8192;
+
+/** Machine-readable failure kinds for extraction. The API route maps
+ * these to distinct error codes so the user (and the logs) can tell
+ * an Anthropic outage from a bad model reply from anything else. */
+export type ExtractionErrorCode = "ai_unavailable" | "invalid_output" | "extraction_failed";
+
+export class ExtractionError extends Error {
+  readonly code: ExtractionErrorCode;
+  readonly httpStatus: number;
+  /** Short, content-free detail for server logs — never image data,
+   * never extracted text, never raw error messages (Zod/JSON errors
+   * can echo model output). */
+  readonly logDetail: string;
+  constructor(code: ExtractionErrorCode, httpStatus: number, logDetail: string) {
+    super(`Extraction failed (${code})`);
+    this.name = "ExtractionError";
+    this.code = code;
+    this.httpStatus = httpStatus;
+    this.logDetail = logDetail;
+  }
+}
+
+/**
+ * Classify any failure escaping the extractor for the API route.
+ * ExtractionErrors pass through. Anthropic SDK failures carry a
+ * numeric `status` (401 auth, 429 rate limit, 500/529 overload) —
+ * read it duck-typed so this module never needs the SDK at import
+ * time. Auth problems are the caller's key, not a photo problem, so
+ * they stay on the generic code (friendly UI message) while the log
+ * line still names them. Anything else is the generic fallback,
+ * logged by error name only — never the message, which can echo
+ * model output (Zod/JSON errors) or image-adjacent text.
+ */
+export function classifyExtractionError(err: unknown): ExtractionError {
+  if (err instanceof ExtractionError) return err;
+  const status =
+    typeof err === "object" &&
+    err !== null &&
+    "status" in err &&
+    typeof (err as { status: unknown }).status === "number"
+      ? (err as { status: number }).status
+      : undefined;
+  if (status === 401 || status === 403) {
+    return new ExtractionError("extraction_failed", 502, `anthropic_auth status=${status}`);
+  }
+  if (status === 429) {
+    return new ExtractionError("ai_unavailable", 503, "anthropic_rate_limited status=429");
+  }
+  if (status !== undefined && status >= 500) {
+    return new ExtractionError("ai_unavailable", 503, `anthropic_server_error status=${status}`);
+  }
+  return new ExtractionError(
+    "extraction_failed",
+    502,
+    err instanceof Error ? err.name : "unknown_error",
+  );
+}
+
+/**
+ * Turn a Zod validation failure into a short, content-free hint for
+ * the retry prompt: field paths and issue codes only, never values —
+ * values could be text copied from the photo.
+ */
+function validationHints(err: unknown): string | null {
+  if (
+    typeof err === "object" &&
+    err !== null &&
+    "issues" in err &&
+    Array.isArray((err as { issues: unknown }).issues)
+  ) {
+    const hints = (
+      err as { issues: { path: (string | number)[]; code: string }[] }
+    ).issues
+      .slice(0, 5)
+      .map((issue) => `${issue.path.join(".") || "result"}: ${issue.code}`);
+    return hints.length > 0 ? hints.join("; ") : null;
+  }
+  return null;
+}
+
 export function getAnthropicModel(): string {
   return process.env.ANTHROPIC_MODEL?.trim() || DEFAULT_ANTHROPIC_MODEL;
 }
@@ -200,31 +286,68 @@ export class AnthropicExtractor implements ScheduleExtractor {
       },
     ];
 
-    const call = async (messages: Anthropic.MessageParam[]) =>
-      client.messages.create({
-        model: getAnthropicModel(),
-        max_tokens: 4096,
-        system,
-        messages,
-      });
+    const call = async (messages: Anthropic.MessageParam[]) => {
+      try {
+        return await client.messages.create({
+          model: getAnthropicModel(),
+          max_tokens: MAX_OUTPUT_TOKENS,
+          system,
+          messages,
+        });
+      } catch (err) {
+        // An API failure (bad key, rate limit, overload) is not a
+        // photo problem and a retry of the same call will not fix it.
+        throw classifyExtractionError(err);
+      }
+    };
 
     const first = await call([{ role: "user", content: userContent }]);
     const firstText = responseText(first.content);
     try {
       return validate(extractResultSchema.parse(extractJsonFromText(firstText)));
-    } catch {
-      // Retry once: show the model its bad output and ask it to fix it.
-      const second = await call([
-        { role: "user", content: userContent },
-        { role: "assistant", content: firstText },
-        {
-          role: "user",
-          content:
-            "Your previous reply was not valid JSON matching the required schema. Reply again with ONLY the corrected JSON object, exactly matching the schema. Do not add any explanation.",
-        },
-      ]);
+    } catch (err) {
+      // Retry once: show the model its bad output and ask it to fix
+      // it — compactly, so a reply that was truncated for length has
+      // room, and with the exact validation problems so it does not
+      // repeat the same mistake. An empty first reply cannot be
+      // echoed back as an assistant message (the API rejects empty
+      // text blocks), so in that case retry from scratch.
+      const hints = validationHints(err);
+      const fixInstruction =
+        "Your previous reply was not valid JSON matching the required schema. " +
+        "Reply again with ONLY the corrected JSON object, exactly matching the schema. " +
+        "Keep every notes and warnings entry to one short sentence. Do not add any explanation." +
+        (hints ? ` Validation problems: ${hints}.` : "");
+      const second = firstText.trim()
+        ? await call([
+            { role: "user", content: userContent },
+            { role: "assistant", content: firstText },
+            { role: "user", content: fixInstruction },
+          ])
+        : await call([
+            {
+              role: "user",
+              content: [
+                ...userContent,
+                {
+                  type: "text",
+                  text: "Your previous reply was empty. Reply with ONLY the JSON object, exactly matching the schema. Keep every notes and warnings entry to one short sentence.",
+                },
+              ],
+            },
+          ]);
       const secondText = responseText(second.content);
-      return validate(extractResultSchema.parse(extractJsonFromText(secondText)));
+      try {
+        return validate(extractResultSchema.parse(extractJsonFromText(secondText)));
+      } catch {
+        // Both attempts failed to produce valid output — say so
+        // distinctly instead of the generic "couldn't read it".
+        throw new ExtractionError(
+          "invalid_output",
+          502,
+          "model_output_invalid_after_retry",
+        );
+      }
     }
   }
 }
