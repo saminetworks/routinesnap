@@ -1,9 +1,10 @@
 import { Quote } from "lucide-react";
 import { getTranslations } from "next-intl/server";
+import Image from "next/image";
 import { Reveal } from "./reveal";
 
 /**
- * Founder / maker note: avatar placeholder (initials), quote, name/role.
+ * Founder / maker note: real founder photo, quote, name/role.
  * Social links are config-driven in siteConfig.socials — all are empty
  * for now, so no dead links are rendered here either (see SiteFooter).
  */
@@ -25,12 +26,13 @@ export async function Maker() {
             {t("quote")}
           </blockquote>
           <footer className="mt-6 flex items-center gap-3">
-            <span
-              aria-hidden
-              className="bg-gradient-primary flex size-11 items-center justify-center rounded-full text-base font-extrabold text-white"
-            >
-              A
-            </span>
+            <Image
+              src="/images/founder.jpg"
+              alt={t("name")}
+              width={44}
+              height={44}
+              className="size-11 shrink-0 rounded-full object-cover"
+            />
             <span>
               <span className="block text-sm font-semibold">{t("name")}</span>
               <span className="block text-sm text-muted-foreground">

@@ -1,7 +1,13 @@
 import { Link } from "@/i18n/navigation";
 import { siteConfig } from "@/config/site";
 
-/** Shared product logo (gradient tile + name). */
+/**
+ * Shared product logo: the "Snap" mark (camera whose lens is a mini
+ * calendar, public/logo.svg) + name. The mark is a plain <img> — it is
+ * vector, so it stays crisp at every size, and the same file is the
+ * source for the favicon and PWA icons (see scripts/generate-icons.mjs
+ * and scripts/generate-favicon.mjs).
+ */
 export function Logo({ className = "" }: { className?: string }) {
   return (
     <Link
@@ -9,12 +15,14 @@ export function Logo({ className = "" }: { className?: string }) {
       className={`flex min-h-11 items-center gap-2 text-base font-bold tracking-tight ${className}`}
       aria-label={siteConfig.name}
     >
-      <span
+      <img
+        src="/logo.svg"
+        alt=""
         aria-hidden
-        className="bg-gradient-primary flex size-8 shrink-0 items-center justify-center rounded-[10px] text-base font-extrabold text-white"
-      >
-        R
-      </span>
+        width={32}
+        height={32}
+        className="size-8 shrink-0"
+      />
       {siteConfig.name}
     </Link>
   );

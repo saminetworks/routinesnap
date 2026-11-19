@@ -5,23 +5,18 @@
       <stop offset="1" stop-color="#8B5CF6"/>
     </linearGradient>
   </defs>
-  <!-- Maskable variant: same artwork scaled to 80% and centred, so the
-       mark survives the OS safe-zone crop (maskable icons are cropped
-       to a circle ~80% of the canvas on some launchers). The gradient
-       still bleeds to the full canvas edge. -->
+  <!-- Maskable icon: the mark is scaled to the central 80% so nothing
+       is cropped when the OS applies a mask shape. -->
   <rect width="512" height="512" fill="url(#bg)"/>
   <g transform="translate(51.2 51.2) scale(0.8)">
-    <rect x="106" y="128" width="300" height="272" rx="36" fill="#FFFFFF"/>
-    <path d="M106 164 a36 36 0 0 1 36 -36 h228 a36 36 0 0 1 36 36 v28 H106 Z" fill="#6366F1"/>
-    <rect x="156" y="100" width="30" height="56" rx="15" fill="#FFFFFF"/>
-    <rect x="326" y="100" width="30" height="56" rx="15" fill="#FFFFFF"/>
-    <rect x="138" y="216" width="64" height="64" rx="14" fill="#6366F1"/>
-    <rect x="224" y="216" width="64" height="64" rx="14" fill="#C7D2FE"/>
-    <rect x="310" y="216" width="64" height="64" rx="14" fill="#10B981"/>
-    <rect x="138" y="304" width="64" height="64" rx="14" fill="#DDD6FE"/>
-    <rect x="224" y="304" width="64" height="64" rx="14" fill="#8B5CF6"/>
-    <rect x="310" y="304" width="64" height="64" rx="14" fill="#C7D2FE"/>
-    <circle cx="392" cy="388" r="46" fill="#10B981" stroke="#FFFFFF" stroke-width="10"/>
-    <path d="M372 388 l14 14 l26 -30" fill="none" stroke="#FFFFFF" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+    <rect x="96" y="192" width="320" height="192" rx="48" fill="#FFFFFF"/>
+    <rect x="192" y="144" width="128" height="64" rx="24" fill="#FFFFFF"/>
+    <circle cx="256" cy="288" r="68" fill="#6366F1"/>
+    <circle cx="256" cy="288" r="68" fill="none" stroke="#FFFFFF" stroke-width="12"/>
+    <rect x="232" y="264" width="21" height="21" rx="5" fill="#FFFFFF"/>
+    <rect x="259" y="264" width="21" height="21" rx="5" fill="#FFFFFF"/>
+    <rect x="232" y="291" width="21" height="21" rx="5" fill="#FFFFFF"/>
+    <rect x="259" y="291" width="21" height="21" rx="5" fill="#FFFFFF"/>
+    <circle cx="360" cy="232" r="14" fill="#6366F1"/>
   </g>
 </svg>
