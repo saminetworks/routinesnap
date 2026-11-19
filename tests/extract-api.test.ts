@@ -2,6 +2,7 @@ import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import type { NextRequest } from "next/server";
 import { GET as healthGET } from "@/app/api/health/route";
 import {
+  ApiExtractor,
   classifyExtractionError,
   extractJsonFromText,
   ExtractionError,
@@ -157,6 +158,60 @@ describe("normalizeExtractedJson", () => {
     expect(out.events[2].endTime).toBe("22:00");
     expect(out.events[3].startTime).toBe("09:00");
     expect(() => extractResultSchema.parse(out)).not.toThrow();
+  });
+});
+
+describe("ApiExtractor (browser upload)", () => {
+  const input = {
+    imageDataUrl: "data:image/jpeg;base64,/9j/",
+    category: "class-routine" as const,
+    locale: "en" as const,
+    timezone: "Asia/Dhaka",
+    referenceDate: "2026-11-19",
+  };
+
+  it("uploads the provided blob directly without re-fetching the data URL", async () => {
+    const fetchMock = vi.fn(async (url: string) => {
+      expect(url).toBe("/api/extract");
+      return {
+        ok: true,
+        json: async () => validResult,
+      } as Response;
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    try {
+      const out = await new ApiExtractor().extract({
+        ...input,
+        imageBlob: new Blob(["fake-jpeg"], { type: "image/jpeg" }),
+      });
+      expect(out.events).toHaveLength(1);
+      // One fetch only — the /api/extract POST. A data-URL fetch here
+      // would be a second call and a needless failure point.
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      const form = fetchMock.mock.calls[0][1].body as FormData;
+      expect(form.get("image")).toBeInstanceOf(Blob);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("falls back to fetching the data URL when no blob is provided", async () => {
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.startsWith("data:")) {
+        return { blob: async () => new Blob(["fake-jpeg"], { type: "image/jpeg" }) } as Response;
+      }
+      return { ok: true, json: async () => validResult } as Response;
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    try {
+      const out = await new ApiExtractor().extract(input);
+      expect(out.events).toHaveLength(1);
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      expect(fetchMock.mock.calls[0][0]).toBe(input.imageDataUrl);
+      expect(fetchMock.mock.calls[1][0]).toBe("/api/extract");
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });
 

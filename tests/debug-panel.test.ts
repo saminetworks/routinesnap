@@ -90,6 +90,12 @@ describe("formatLastExtract", () => {
     );
     expect(formatLastExtract({ code: "ai_unavailable" })).toBe("ai_unavailable");
   });
+
+  it("shows the raw error when the call never got a response", () => {
+    expect(
+      formatLastExtract({ status: null, code: "extractError", detail: "Failed to fetch" }),
+    ).toBe("no response · extractError · Failed to fetch");
+  });
 });
 
 describe("ScanDebugPanel gating", () => {

@@ -168,6 +168,7 @@ export function ScanPage() {
     try {
       const extracted = await createExtractor().extract({
         imageDataUrl: img.dataUrl,
+        imageBlob: img.blob,
         category,
         locale,
         timezone,
@@ -178,6 +179,12 @@ export function ScanPage() {
     } catch (err) {
       // The API returns machine-readable codes; show a friendly,
       // translated message for each instead of the raw error.
+      // The raw message is also logged + kept in the debug panel:
+      // when the call never reaches the server, that message
+      // ("Failed to fetch", a validation error, ...) is the only
+      // clue to what actually went wrong.
+      console.error("[scan] extract failed:", err);
+      const detail = err instanceof Error ? err.message : String(err);
       let code: string | null = null;
       if (err instanceof ApiExtractError) {
         code = err.code;
@@ -190,7 +197,7 @@ export function ScanPage() {
         code = "extractError";
         setError(t("extractError"));
       }
-      setLastExtract({ status: null, code });
+      setLastExtract({ status: null, code, detail });
       // The snap helper opens automatically on failure, with the real
       // error code + the photo-quality signals for its explanation.
       setHelperErrorCode(code);
@@ -242,8 +249,13 @@ export function ScanPage() {
       }
       setLastExtract({ status: res.status, code: null });
       applyExtractResult(extractResultSchema.parse(body));
-    } catch {
-      setLastExtract({ status: null, code: "extractError" });
+    } catch (err) {
+      console.error("[scan] extract-text failed:", err);
+      setLastExtract({
+        status: null,
+        code: "extractError",
+        detail: err instanceof Error ? err.message : String(err),
+      });
       setError(t("extractError"));
       setHelperErrorCode("extractError");
       setHelperOpen(true);

@@ -13,6 +13,13 @@ import { addMinutes, containsTimeOfDayWord, parseTimeInput } from "@/lib/time-in
 export interface ExtractInput {
   /** Processed image as a data URL (already resized + EXIF-stripped). */
   imageDataUrl: string;
+  /**
+   * The same image as a Blob. When provided, the extractor uploads it
+   * directly instead of re-fetching the data URL to make a Blob — that
+   * round-trip is a needless failure point (a data-URL fetch that throws
+   * fails the whole scan before any request reaches the server).
+   */
+  imageBlob?: Blob;
   category: CategoryInput;
   locale: "en" | "bn" | "ja";
   timezone: string;
@@ -497,7 +504,10 @@ export class ApiExtractError extends Error {
  */
 export class ApiExtractor implements ScheduleExtractor {
   async extract(input: ExtractInput): Promise<ExtractResult> {
-    const blob = await (await fetch(input.imageDataUrl)).blob();
+    // Prefer the Blob the caller already has: re-fetching the data URL
+    // to make one is a needless failure point (see ExtractInput).
+    const blob =
+      input.imageBlob ?? (await (await fetch(input.imageDataUrl)).blob());
     const form = new FormData();
     form.append("image", blob, "routine.jpg");
     form.append("category", input.category);

@@ -53,6 +53,12 @@ export interface LastExtractInfo {
   status?: number | null;
   /** Machine-readable error code from the response, e.g. "extraction_failed". */
   code?: string | null;
+  /**
+   * The raw error message when the call never got a response
+   * (e.g. "Failed to fetch") — the one detail that tells us WHY a
+   * scan failed in the browser instead of on the server.
+   */
+  detail?: string | null;
 }
 
 export interface DebugPanelLabels {
@@ -142,13 +148,19 @@ export function formatImageSummary(image: ProcessedImage | DebugPanelImage | nul
   return parts.length > 0 ? parts.join(" · ") : "—";
 }
 
-/** "200" / "502 · extraction_failed" / "—" when nothing has run yet. */
+/** "200" / "502 · extraction_failed" / "no response · extractError · Failed to fetch" / "—" when nothing has run yet. */
 export function formatLastExtract(lastExtract?: LastExtractInfo | null): string {
   if (!lastExtract) return "—";
   const parts: string[] = [];
   if (typeof lastExtract.status === "number") parts.push(String(lastExtract.status));
   if (lastExtract.code) parts.push(lastExtract.code);
-  return parts.length > 0 ? parts.join(" · ") : "—";
+  if (lastExtract.detail) parts.push(lastExtract.detail);
+  if (parts.length === 0) return "—";
+  // A raw error message only exists when the call never got a response.
+  if (lastExtract.detail && typeof lastExtract.status !== "number") {
+    parts.unshift("no response");
+  }
+  return parts.join(" · ");
 }
 
 export function ScanDebugPanel({
