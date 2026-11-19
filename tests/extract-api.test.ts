@@ -12,6 +12,7 @@ import {
   hasAnthropicKey,
   MAX_OUTPUT_TOKENS,
   MockExtractor,
+  normalizeExtractedJson,
   DEFAULT_ANTHROPIC_MODEL,
 } from "@/lib/ai/extractor";
 import { getSystemPrompt, PROMPT_CATEGORIES } from "@/lib/ai/prompts/index";
@@ -87,6 +88,75 @@ describe("ExtractResult Zod schema", () => {
         events: [{ ...validResult.events[0], date: "16/11/2026" }],
       }),
     ).toThrow();
+  });
+});
+
+describe("normalizeExtractedJson", () => {
+  // A first attempt that reads the schedule right but writes times the
+  // way they appear in the photo ("8:30", "1:00 PM") must still pass
+  // the strict schema instead of forcing a second, slow AI call.
+  it("pads unpadded hours and converts 12-hour times to 24-hour HH:mm", () => {
+    const out = normalizeExtractedJson({
+      ...validResult,
+      events: [
+        { ...validResult.events[0], startTime: "8:30", endTime: "10:00" },
+        { ...validResult.events[0], startTime: "1:00 PM", endTime: "2:30 PM" },
+        { ...validResult.events[0], startTime: "12:00 AM", endTime: "12:00 PM" },
+      ],
+    }) as typeof validResult;
+    expect(out.events[0].startTime).toBe("08:30");
+    expect(out.events[1].startTime).toBe("13:00");
+    expect(out.events[1].endTime).toBe("14:30");
+    expect(out.events[2].startTime).toBe("00:00");
+    expect(out.events[2].endTime).toBe("12:00");
+    expect(() => extractResultSchema.parse(out)).not.toThrow();
+  });
+
+  it("maps weekday and language names and string confidences to schema values", () => {
+    const out = normalizeExtractedJson({
+      detectedCategory: "class_routine",
+      language: "English",
+      assumptions: [],
+      warnings: [],
+      events: [
+        { ...validResult.events[0], weekday: "Saturday", confidence: "0.9" },
+        { ...validResult.events[0], weekday: "sa", confidence: "0.8" },
+      ],
+    }) as typeof validResult;
+    expect(out.detectedCategory).toBe("class-routine");
+    expect(out.language).toBe("en");
+    expect(out.events[0].weekday).toBe("SA");
+    expect(out.events[0].confidence).toBe(0.9);
+    expect(out.events[1].weekday).toBe("SA");
+    expect(() => extractResultSchema.parse(out)).not.toThrow();
+  });
+
+  it("leaves unparsable values untouched so validation still rejects them", () => {
+    const out = normalizeExtractedJson({
+      ...validResult,
+      events: [{ ...validResult.events[0], startTime: "half past eight" }],
+    });
+    expect(() => extractResultSchema.parse(out)).toThrow();
+  });
+
+  it("turns time-of-day words into times and assumes a 1-hour event", () => {
+    const out = normalizeExtractedJson({
+      ...validResult,
+      events: [
+        { ...validResult.events[0], startTime: "morning", endTime: undefined },
+        { ...validResult.events[0], startTime: "bekal", endTime: undefined },
+        { ...validResult.events[0], startTime: "9 in the evening", endTime: undefined },
+        { ...validResult.events[0], startTime: "সকাল", endTime: undefined },
+      ],
+    }) as typeof validResult;
+    expect(out.events[0].startTime).toBe("09:00");
+    expect(out.events[0].endTime).toBe("10:00");
+    expect(out.events[1].startTime).toBe("16:00");
+    expect(out.events[1].endTime).toBe("17:00");
+    expect(out.events[2].startTime).toBe("21:00");
+    expect(out.events[2].endTime).toBe("22:00");
+    expect(out.events[3].startTime).toBe("09:00");
+    expect(() => extractResultSchema.parse(out)).not.toThrow();
   });
 });
 
@@ -183,6 +253,38 @@ describe("extraction failure classification", () => {
       referenceDate: "2026-11-17",
     });
     expect(prompt).toContain("events: []");
+  });
+
+  it("base rules tell the model how to read a blurry or dark photo", async () => {
+    const prompt = await getSystemPrompt("class-routine", {
+      locale: "en",
+      timezone: "Asia/Dhaka",
+      referenceDate: "2026-11-17",
+    });
+    expect(prompt).toContain("blurry, dark or low quality");
+    expect(prompt).toContain("course codes and room numbers");
+  });
+
+  it("class-routine prompt converts AM/PM times to 24-hour", async () => {
+    const prompt = await getSystemPrompt("class-routine", {
+      locale: "en",
+      timezone: "Asia/Dhaka",
+      referenceDate: "2026-11-17",
+    });
+    expect(prompt).toContain('"1:00 PM"');
+    expect(prompt).toContain('"13:00"');
+  });
+
+  it("base rules cover handwriting and time-of-day words", async () => {
+    const prompt = await getSystemPrompt("class-routine", {
+      locale: "en",
+      timezone: "Asia/Dhaka",
+      referenceDate: "2026-11-17",
+    });
+    expect(prompt).toContain("HANDWRITTEN");
+    expect(prompt).toContain("sokal");
+    expect(prompt).toContain("bekal");
+    expect(prompt).toContain("9 in the evening");
   });
 });
 

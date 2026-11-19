@@ -139,6 +139,33 @@ describe("computeQualityFromPixels — glare vs normal", () => {
     expect(q.glare).toBe(false);
     expect(q.glareFraction).toBe(0);
   });
+
+  it("does not flag a clean digital schedule (mostly white background) as glare", () => {
+    // A digital routine table: ~69% pure-white background, the rest
+    // dark text — the median is white, so the bright fraction is
+    // normal paper, not a flash blow-out. (This is the user's real
+    // DIU routine photo: median 255, 64% of pixels >= 245.)
+    const q = computeQualityFromPixels(
+      makePixels(16, 16, (x) => (x < 11 ? [255, 255, 255] : [30, 30, 30])),
+      16,
+      16,
+    );
+    expect(q.glareFraction).toBeCloseTo(11 / 16, 2);
+    expect(q.medianLuminance).toBe(255);
+    expect(q.glare).toBe(false);
+  });
+
+  it("still flags a blown-out patch on a darker photo as glare", () => {
+    // Half the frame blown white, half mid-gray: the median stays
+    // low (191.5), so this is a real glare patch, not white paper.
+    const q = computeQualityFromPixels(
+      makePixels(16, 16, (x) => (x < 8 ? [255, 255, 255] : [128, 128, 128])),
+      16,
+      16,
+    );
+    expect(q.medianLuminance).toBeCloseTo(191.5, 1);
+    expect(q.glare).toBe(true);
+  });
 });
 
 describe("unknown / unreadable input never throws", () => {

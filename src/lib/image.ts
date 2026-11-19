@@ -32,7 +32,7 @@ export const ACCEPTED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/h
 export const ACCEPTED_EXTENSIONS = [".jpg", ".jpeg", ".png", ".webp", ".heic", ".heif"];
 
 /** How the image was sent to the AI. Exactly one of these applies. */
-export type ProcessingKind = "as-is" | "heic" | "orientation" | "oversize" | "exif-gps";
+export type ProcessingKind = "as-is" | "heic" | "orientation" | "oversize" | "exif-gps" | "enhanced";
 
 export interface ProcessedImage {
   dataUrl: string;
@@ -361,7 +361,9 @@ export function decideProcessing(input: {
   size: number;
   width: number;
   height: number;
-}): ProcessingKind {
+  // "enhanced" is a separate post-upload step (see image-enhance.ts),
+  // never a decision of the upload pipeline.
+}): Exclude<ProcessingKind, "enhanced"> {
   if (input.orientation !== 1) return "orientation";
   if (input.size > MAX_IMAGE_BYTES || Math.max(input.width, input.height) > MAX_LONG_EDGE) return "oversize";
   if (input.hasGps) return "exif-gps";
@@ -373,7 +375,8 @@ export function decideProcessing(input: {
 /* Browser-only helpers (canvas / Image / FileReader-free).            */
 /* ------------------------------------------------------------------ */
 
-function loadImage(src: string): Promise<HTMLImageElement> {
+/** Shared by image-enhance.ts so enhancement reuses the same decode path. */
+export function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.onload = () => resolve(img);
@@ -391,7 +394,8 @@ function bytesToDataUrl(bytes: Uint8Array, mimeType: string): string {
   return `data:${mimeType};base64,${btoa(binary)}`;
 }
 
-function canvasToBlob(canvas: HTMLCanvasElement): Promise<Blob> {
+/** Shared by image-enhance.ts so enhancement reuses the same encode path. */
+export function canvasToBlob(canvas: HTMLCanvasElement): Promise<Blob> {
   return new Promise((resolve, reject) => {
     canvas.toBlob(
       (b) => (b ? resolve(b) : reject(new Error("Could not process this image."))),

@@ -3,6 +3,7 @@ import type Anthropic from "@anthropic-ai/sdk";
 import type { CategorySlug } from "@/config/categories";
 import { extractResultSchema, type CategoryInput, type ExtractResult } from "@/lib/ai/schema";
 import { nextMonday } from "@/lib/dates";
+import { addMinutes, containsTimeOfDayWord, parseTimeInput } from "@/lib/time-input";
 
 /**
  * Extractor interface (spec §9). The scan UI only ever talks to this
@@ -132,7 +133,7 @@ function responseText(content: Anthropic.ContentBlock[]): string {
     .map((b) => (b as { text: string }).text)
     .join("\n");
 }
-export const DEFAULT_ANTHROPIC_MODEL = "claude-sonnet-4-5";
+export const DEFAULT_ANTHROPIC_MODEL = "claude-sonnet-5-5";
 
 /** Output budget for a single model reply. Raised from 4096: a full
  * weekly table (11+ events with long titles, rooms and notes) plus
@@ -261,6 +262,94 @@ export function extractJsonFromText(text: string): unknown {
   return JSON.parse(candidate.slice(start, end + 1));
 }
 
+const WEEKDAY_BY_NAME: Record<string, string> = {
+  mo: "MO", monday: "MO", mon: "MO",
+  tu: "TU", tuesday: "TU", tue: "TU", tues: "TU",
+  we: "WE", wednesday: "WE", wed: "WE",
+  th: "TH", thursday: "TH", thu: "TH", thur: "TH", thurs: "TH",
+  fr: "FR", friday: "FR", fri: "FR",
+  sa: "SA", saturday: "SA", sat: "SA",
+  su: "SU", sunday: "SU", sun: "SU",
+};
+
+const LANGUAGE_BY_NAME: Record<string, string> = {
+  en: "en", english: "en",
+  bn: "bn", bangla: "bn", bengali: "bn",
+  ja: "ja", japanese: "ja",
+  mixed: "mixed",
+};
+
+const CATEGORY_SLUGS = new Set([
+  "class-routine",
+  "exam-routine",
+  "duty-roster",
+  "invitation-card",
+  "medicine-schedule",
+  "match-fixture",
+]);
+
+/**
+ * Forgiving pre-validation pass over the model's JSON. The model
+ * usually reads the schedule right but slips on formatting — an
+ * unpadded hour ("8:30"), a 12-hour time ("1:00 PM"), a time written
+ * as a word ("morning", "sokal", "বিকাল"), a weekday name
+ * ("Saturday"), a language name ("English") or a confidence as a
+ * string ("0.9") — and any one of those fails the strict schema and
+ * forces a second, slow AI call. Normalizing here keeps the first
+ * attempt valid, so most scans finish in one call (~25s) instead of
+ * two (~60s). Times go through the same parseTimeInput the manual
+ * editor uses. A start time that was only a word gets a default
+ * 1-hour end time when the model gave none. Anything still
+ * unparsable is left untouched so validation (and the retry) still
+ * catches it.
+ */
+export function normalizeExtractedJson(value: unknown): unknown {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return value;
+  const obj = value as Record<string, unknown>;
+  const out: Record<string, unknown> = { ...obj };
+  if (typeof out.detectedCategory === "string") {
+    const slug = out.detectedCategory.trim().toLowerCase().replace(/[\s_]+/g, "-");
+    if (CATEGORY_SLUGS.has(slug)) out.detectedCategory = slug;
+  }
+  if (typeof out.language === "string") {
+    const lang = LANGUAGE_BY_NAME[out.language.trim().toLowerCase()];
+    if (lang) out.language = lang;
+  }
+  if (!Array.isArray(out.events)) return out;
+  out.events = out.events.map((event) => {
+    if (typeof event !== "object" || event === null || Array.isArray(event)) return event;
+    const e: Record<string, unknown> = { ...(event as Record<string, unknown>) };
+    for (const key of ["startTime", "endTime"] as const) {
+      const raw = e[key];
+      if (typeof raw !== "string") continue;
+      const normalized = parseTimeInput(raw);
+      if (normalized === null) continue;
+      e[key] = normalized;
+      // Only a word was given ("morning", "bekal", "9 in the evening")
+      // — the model gave no end time, so assume the event lasts 1 hour.
+      if (key === "startTime" && containsTimeOfDayWord(raw) && typeof e.endTime !== "string") {
+        e.endTime = addMinutes(normalized, 60);
+      }
+    }
+    if (typeof e.weekday === "string") {
+      const code = WEEKDAY_BY_NAME[e.weekday.trim().toLowerCase()];
+      if (code) e.weekday = code;
+    }
+    if (typeof e.confidence === "string") {
+      const n = Number(e.confidence);
+      if (Number.isFinite(n)) e.confidence = n;
+    }
+    if (typeof e.date === "string") {
+      const parts = e.date.trim().replace(/\//g, "-").split("-");
+      if (parts.length === 3 && parts[0].length === 4) {
+        e.date = `${parts[0]}-${parts[1].padStart(2, "0")}-${parts[2].padStart(2, "0")}`;
+      }
+    }
+    return e;
+  });
+  return out;
+}
+
 type SupportedMediaType = "image/jpeg" | "image/png" | "image/webp" | "image/gif";
 
 function parseDataUrl(dataUrl: string): { mediaType: SupportedMediaType; base64: string } {
@@ -324,8 +413,15 @@ export class AnthropicExtractor implements ScheduleExtractor {
     const first = await call([{ role: "user", content: userContent }]);
     const firstText = responseText(first.content);
     try {
-      return validate(extractResultSchema.parse(extractJsonFromText(firstText)));
+      return validate(
+        extractResultSchema.parse(normalizeExtractedJson(extractJsonFromText(firstText))),
+      );
     } catch (err) {
+      // Log the (content-free) validation problems so a slow scan
+      // can be diagnosed from the server log without logging any
+      // extracted content: e.g. "events.2.startTime: invalid_format".
+      const firstHints = validationHints(err);
+      if (firstHints) console.warn(`[extract] first_attempt_invalid: ${firstHints}`);
       // Retry once: show the model its bad output and ask it to fix
       // it — compactly, so a reply that was truncated for length has
       // room, and with the exact validation problems so it does not
@@ -358,7 +454,9 @@ export class AnthropicExtractor implements ScheduleExtractor {
           ]);
       const secondText = responseText(second.content);
       try {
-        return validate(extractResultSchema.parse(extractJsonFromText(secondText)));
+        return validate(
+          extractResultSchema.parse(normalizeExtractedJson(extractJsonFromText(secondText))),
+        );
       } catch {
         // Both attempts failed to produce valid output — say so
         // distinctly instead of the generic "couldn't read it".

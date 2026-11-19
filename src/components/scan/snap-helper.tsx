@@ -113,6 +113,8 @@ export interface SnapHelperLabels {
   showTips: string;
   hideTips: string;
   retry: string;
+  /** "Enhance photo & try again" — brightens/sharpens, then re-scans. */
+  enhanceAndRetry: string;
   manualAdd: string;
 }
 
@@ -146,6 +148,7 @@ export const DEFAULT_SNAP_HELPER_LABELS: SnapHelperLabels = {
   showTips: "How to take a good photo",
   hideTips: "Hide tips",
   retry: "Try again",
+  enhanceAndRetry: "Enhance photo & try again",
   manualAdd: "Add events manually",
 };
 
@@ -164,6 +167,8 @@ export interface SnapHelperProps {
   onShowTips?: () => void;
   /** "Try again" — re-runs the last extraction. */
   onRetry?: () => void;
+  /** "Enhance photo & try again" — enhances a hard-to-read photo, then re-scans. Only shown when the photo has a quality flag. */
+  onEnhanceAndRetry?: () => void;
   /** "Add events manually" — goes to manual entry. */
   onManualAdd?: () => void;
   /** Close (×) button. */
@@ -181,6 +186,7 @@ export function SnapHelper({
   onRetake,
   onShowTips,
   onRetry,
+  onEnhanceAndRetry,
   onManualAdd,
   onClose,
   labels,
@@ -213,6 +219,13 @@ export function SnapHelper({
     { testId: "snap-retake", label: l.retake, onClick: onRetake },
     { testId: "snap-tips", label: tipsOpen ? l.hideTips : l.showTips, onClick: onShowTips },
     { testId: "snap-retry", label: l.retry, onClick: onRetry, primary: true },
+    // Only when the photo was flagged hard to read: enhance it first,
+    // then scan the enhanced copy.
+    {
+      testId: "snap-enhance-retry",
+      label: l.enhanceAndRetry,
+      onClick: flags.length > 0 ? onEnhanceAndRetry : undefined,
+    },
     { testId: "snap-manual", label: l.manualAdd, onClick: onManualAdd },
   ].filter((a) => a.onClick !== undefined);
 

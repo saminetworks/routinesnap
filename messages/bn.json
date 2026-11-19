@@ -337,6 +337,11 @@
   "qualityBlurry": "ছবিটি ঝাপসা মনে হচ্ছে।",
   "qualityGlare": "ছবিতে উজ্জ্বল আলোর ঝলকানি আছে।",
   "qualityRetake": "আবার ছবি তুলুন",
+  "enhancePhoto": "ছবি পরিষ্কার করুন",
+  "enhancingPhoto": "ছবি পরিষ্কার করা হচ্ছে…",
+  "enhancedPhoto": "পড়ার জন্য ছবি পরিষ্কার করা হয়েছে",
+  "useOriginal": "আসল ছবি ব্যবহার করুন",
+  "timePlaceholder": "09:00 অথবা 1:00 PM",
   "needHelp": "সাহায্য লাগবে?",
   "pasteTabPhoto": "ছবি",
   "pasteTabText": "টেক্সট পেস্ট করুন",
@@ -363,6 +368,7 @@
    "showTips": "ভালো ছবি তোলার উপায়",
    "hideTips": "টিপস লুকান",
    "retry": "আবার চেষ্টা করুন",
+   "enhanceAndRetry": "ছবি পরিষ্কার করে আবার চেষ্টা করুন",
    "manualAdd": "নিজে ইভেন্ট যোগ করুন"
   },
   "debug": {

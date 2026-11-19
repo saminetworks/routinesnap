@@ -63,7 +63,7 @@ has a safe default.
 | Variable | Default | What it does |
 | --- | --- | --- |
 | `ANTHROPIC_API_KEY` | *(empty)* | Anthropic key for real vision extraction. Empty → the mock extractor is used, so scanning still works end-to-end. Get a key at https://console.anthropic.com → API Keys. |
-| `ANTHROPIC_MODEL` | `claude-sonnet-4-5` | Claude vision-capable model used by `/api/extract`. |
+| `ANTHROPIC_MODEL` | `claude-sonnet-5-5` | Claude vision-capable model used by `/api/extract`. |
 | `UPSTASH_REDIS_REST_URL` | *(empty)* | Upstash Redis URL for rate limiting. Empty → in-memory per-IP counter (fine for dev / single server). |
 | `UPSTASH_REDIS_REST_TOKEN` | *(empty)* | Upstash Redis token (pair with the URL above). |
 | `NEXT_PUBLIC_SITE_URL` | `http://localhost:3000` | Public base URL. Used for canonical URLs, sitemap, and OpenGraph. **Set this to your real domain before deploying**, or those will point at localhost. |
@@ -90,7 +90,7 @@ flowchart LR
     D --> P[Client: resize, strip EXIF/GPS]
     P --> API[POST /api/extract]
     API --> RL[Rate limit: Upstash Redis or in-memory]
-    RL --> AI[Anthropic vision — claude-sonnet-4-5]
+    RL --> AI[Anthropic vision — claude-sonnet-5-5]
     AI --> Z[Zod validation + one JSON-fix retry]
     Z --> E[Confirm / edit screen]
     E --> ICS[Download .ics — VALARM + RRULE]

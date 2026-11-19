@@ -337,6 +337,11 @@
   "qualityBlurry": "写真がぼやけているようです。",
   "qualityGlare": "写真に強い光の反射があります。",
   "qualityRetake": "撮り直す",
+  "enhancePhoto": "写真を補正する",
+  "enhancingPhoto": "写真を補正しています…",
+  "enhancedPhoto": "読みやすく写真を補正しました",
+  "useOriginal": "元の写真に戻す",
+  "timePlaceholder": "09:00 または 1:00 PM",
   "needHelp": "ヘルプが必要ですか？",
   "pasteTabPhoto": "写真",
   "pasteTabText": "テキストを貼り付け",
@@ -363,6 +368,7 @@
    "showTips": "良い写真の撮り方",
    "hideTips": "ヒントを隠す",
    "retry": "もう一度試す",
+   "enhanceAndRetry": "写真を補正して再試行",
    "manualAdd": "イベントを手動で追加"
   },
   "debug": {

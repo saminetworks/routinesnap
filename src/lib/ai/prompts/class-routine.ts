@@ -14,8 +14,14 @@ board or WhatsApp photo.
 - Title is the subject, in the original language (e.g. "Physics",
   "গণিত", "数学"). Put the teacher's name in "notes" and the room in
   "location" (e.g. "Room 204", "Lab 2").
+- Times in the photo may be 12-hour with AM/PM ("8:30 AM", "1:00 PM")
+  — always convert them to 24-hour HH:mm ("08:30", "13:00").
 - A table cell that spans two periods is one event with the combined
   start/end time. A blank cell means no class — emit nothing for it.
+- Two neighbouring cells with the same subject are TWO separate
+  events (one per period) — never merge back-to-back periods of the
+  same course into one long event, unless one cell visibly spans
+  both periods.
 - If the routine covers Saturday–Thursday (Bangladesh school week) do
   not force it onto a Monday–Friday week; use the weekdays shown.
 - Default reminder: 30 minutes before each class, unless the user

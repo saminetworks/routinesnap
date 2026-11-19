@@ -115,7 +115,7 @@ describe("ScanDebugPanel content", () => {
       image,
       processing: "processed",
       lastExtract: { status: 502, code: "extraction_failed" },
-      model: "claude-sonnet-4-5",
+      model: "claude-sonnet-5-5",
       extractor: "anthropic",
     });
     const rendered = JSON.stringify(el);
@@ -123,7 +123,7 @@ describe("ScanDebugPanel content", () => {
     expect(rendered).toContain("image/jpeg");
     expect(rendered).toContain("Processed");
     expect(rendered).toContain("502 · extraction_failed");
-    expect(rendered).toContain("claude-sonnet-4-5");
+    expect(rendered).toContain("claude-sonnet-5-5");
     expect(rendered).toContain("anthropic");
   });
 

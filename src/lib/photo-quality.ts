@@ -19,10 +19,12 @@
  *   grayscale copy. A flat/uniform image scores 0; a sharp
  *   checkerboard or a page of text scores in the thousands. The bar
  *   is deliberately low so only near-flat / very soft photos warn.
- * - glare: more than 25% of pixels are near-white (luminance >= 245),
- *   i.e. blown-out by flash or direct light. A normal schedule photo
- *   has white paper too, but rarely over a quarter of the frame at
- *   full brightness.
+ * - glare: more than 25% of pixels are near-white (luminance >= 245)
+ *   AND the image is not uniformly near-white (median luminance
+ *   below 220). A clean digital schedule has a white background, so
+ *   most of its pixels are near-white — that is normal, not glare.
+ *   Real glare is a blown-out patch against a darker photo, so the
+ *   median stays low while a large fraction blows out.
  *
  * An unreadable image never throws: both entry points return the
  * "unknown" result instead (ok: false, unknown: true, all flags
@@ -44,6 +46,13 @@ export const GLARE_WHITE_THRESHOLD = 245;
 /** Fraction of blown-out pixels above this counts as glare. */
 export const GLARE_FRACTION_THRESHOLD = 0.25;
 
+/**
+ * Median luminance below this is required for a glare flag: a clean
+ * digital schedule is uniformly near-white (median 255), so a high
+ * bright fraction alone is normal paper, not flash blow-out.
+ */
+export const GLARE_MEDIAN_LUMINANCE_THRESHOLD = 220;
+
 /** All thresholds in one object, for the scan page / tests. */
 export const PHOTO_QUALITY_THRESHOLDS = {
   maxEdge: PHOTO_QUALITY_MAX_EDGE,
@@ -51,6 +60,7 @@ export const PHOTO_QUALITY_THRESHOLDS = {
   blurLaplacianVariance: BLUR_LAPLACIAN_VARIANCE_THRESHOLD,
   glareWhite: GLARE_WHITE_THRESHOLD,
   glareFraction: GLARE_FRACTION_THRESHOLD,
+  glareMedianLuminance: GLARE_MEDIAN_LUMINANCE_THRESHOLD,
 } as const;
 
 export interface PhotoQuality {
@@ -66,6 +76,8 @@ export interface PhotoQuality {
   glare: boolean;
   /** Average pixel luminance, 0 (black) to 255 (white). */
   meanLuminance: number;
+  /** Median pixel luminance — guards the glare flag (see above). */
+  medianLuminance: number;
   /** Variance of the Laplacian on the grayscale copy (sharpness). */
   laplacianVariance: number;
   /** Fraction of pixels with luminance >= GLARE_WHITE_THRESHOLD. */
@@ -80,6 +92,7 @@ export const UNKNOWN_PHOTO_QUALITY: PhotoQuality = {
   blurry: false,
   glare: false,
   meanLuminance: 0,
+  medianLuminance: 0,
   laplacianVariance: 0,
   glareFraction: 0,
 };
@@ -131,6 +144,16 @@ export function computeQualityFromPixels(
     const meanLuminance = sum / count;
     const glareFraction = glareCount / count;
 
+    // Median luminance: sorts a copy of the grayscale values. A clean
+    // digital schedule is mostly pure-white background, so its median
+    // sits at 255 — a high bright fraction there is normal paper, not
+    // glare. Real glare is a blown-out patch on a darker photo, so
+    // the median stays well below white.
+    const sorted = Float64Array.from(gray).sort();
+    const mid = Math.floor(count / 2);
+    const medianLuminance =
+      count % 2 === 1 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+
     // Variance of the Laplacian (3x3 cross kernel) on interior
     // pixels only — a cheap sharpness measure. Images smaller than
     // 3x3 have no interior pixels, so sharpness cannot be judged
@@ -171,8 +194,11 @@ export function computeQualityFromPixels(
       unknown: false,
       dark: meanLuminance < DARK_LUMINANCE_THRESHOLD,
       blurry,
-      glare: glareFraction > GLARE_FRACTION_THRESHOLD,
+      glare:
+        glareFraction > GLARE_FRACTION_THRESHOLD &&
+        medianLuminance < GLARE_MEDIAN_LUMINANCE_THRESHOLD,
       meanLuminance: round1(meanLuminance),
+      medianLuminance: round1(medianLuminance),
       laplacianVariance: round1(laplacianVariance),
       glareFraction: Math.round(glareFraction * 10000) / 10000,
     };

@@ -24,6 +24,7 @@ import {
 } from "@/lib/ai/schema";
 import { defaultRepeatUntil, formatDateInput, nextMonday } from "@/lib/dates";
 import { rotateDataUrl, type ProcessedImage } from "@/lib/image";
+import { enhanceImageForReading, shouldEnhance } from "@/lib/image-enhance";
 import { analyzePhotoQuality, type PhotoQuality } from "@/lib/photo-quality";
 import { cn } from "@/lib/utils";
 
@@ -65,6 +66,11 @@ export function ScanPage() {
   const [quality, setQuality] = useState<PhotoQuality | null>(null);
   // Guards the async quality check against a fast image replace.
   const qualityFor = useRef<string | null>(null);
+  // Reading enhancement: the original photo (to revert to) and whether
+  // the current image is the enhanced copy.
+  const [enhancing, setEnhancing] = useState(false);
+  const [enhanced, setEnhanced] = useState(false);
+  const [originalImage, setOriginalImage] = useState<ProcessedImage | null>(null);
   // Part D: last /api/extract response (status + error code) for the debug panel.
   // NOTE: the photo path goes through ApiExtractor, which carries the
   // error code but not the HTTP status, so status is null on photo
@@ -148,8 +154,9 @@ export function ScanPage() {
     setStep("confirm");
   };
 
-  const extract = async () => {
-    if (!image) {
+  const extract = async (imageOverride?: ProcessedImage) => {
+    const img = imageOverride ?? image;
+    if (!img) {
       setError(t("noImage"));
       return;
     }
@@ -160,7 +167,7 @@ export function ScanPage() {
     setExtractMsg(0);
     try {
       const extracted = await createExtractor().extract({
-        imageDataUrl: image.dataUrl,
+        imageDataUrl: img.dataUrl,
         category,
         locale,
         timezone,
@@ -295,6 +302,8 @@ export function ScanPage() {
     setImage(null);
     setQuality(null);
     qualityFor.current = null;
+    setEnhanced(false);
+    setOriginalImage(null);
   };
 
   /** Photo picked: store it, then check quality async — never blocks the extract button. */
@@ -302,6 +311,8 @@ export function ScanPage() {
     setImage(img);
     setError(null);
     setQuality(null);
+    setEnhanced(false);
+    setOriginalImage(null);
     qualityFor.current = img.dataUrl;
     void analyzePhotoQuality(img.dataUrl).then((q) => {
       if (qualityFor.current === img.dataUrl) setQuality(q);
@@ -320,6 +331,65 @@ export function ScanPage() {
     } catch {
       setError(t("couldNotRead"));
     }
+  };
+
+  /**
+   * Reading enhancement: brighten / sharpen / add contrast to a dark,
+   * blurry or washed-out photo so the AI can read it. Only offered
+   * when the quality check flags the photo; a clean photo is always
+   * sent as-is. Returns the enhanced image (or null) so a caller can
+   * scan it right away instead of reading stale state.
+   */
+  const handleEnhance = async (): Promise<ProcessedImage | null> => {
+    if (!image || enhancing || !quality || !shouldEnhance(quality)) return null;
+    setEnhancing(true);
+    try {
+      const result = await enhanceImageForReading(image.dataUrl, quality);
+      const enhancedImage: ProcessedImage = {
+        ...image,
+        dataUrl: result.dataUrl,
+        blob: result.blob,
+        width: result.width,
+        height: result.height,
+        sentAsIs: false,
+        processing: "enhanced",
+      };
+      if (!originalImage) setOriginalImage(image);
+      setImage(enhancedImage);
+      setEnhanced(true);
+      setError(null);
+      // Re-check quality on the enhanced copy: the warning should
+      // clear (or shrink) when the enhancement worked.
+      qualityFor.current = result.dataUrl;
+      void analyzePhotoQuality(result.dataUrl).then((q) => {
+        if (qualityFor.current === result.dataUrl) setQuality(q);
+      });
+      return enhancedImage;
+    } catch {
+      setError(t("couldNotRead"));
+      return null;
+    } finally {
+      setEnhancing(false);
+    }
+  };
+
+  /** Go back to the original photo (before enhancement). */
+  const handleUseOriginal = () => {
+    if (!originalImage) return;
+    setImage(originalImage);
+    setEnhanced(false);
+    setOriginalImage(null);
+    qualityFor.current = originalImage.dataUrl;
+    void analyzePhotoQuality(originalImage.dataUrl).then((q) => {
+      if (qualityFor.current === originalImage.dataUrl) setQuality(q);
+    });
+  };
+
+  /** Snap Helper action: enhance a hard-to-read photo, then scan it. */
+  const handleEnhanceAndRetry = async () => {
+    setHelperOpen(false);
+    const enhancedImage = await handleEnhance();
+    if (enhancedImage) void extract(enhancedImage);
   };
 
   const handleDelete = (event: EditableEvent) => {
@@ -436,8 +506,22 @@ export function ScanPage() {
                       {quality.glare && <li>{t("qualityGlare")}</li>}
                     </ul>
                   </div>
-                  <Button type="button" variant="secondary" size="sm" onClick={clearImage}>
-                    {t("qualityRetake")}
+                  <div className="flex flex-wrap gap-2">
+                    <Button type="button" variant="secondary" size="sm" disabled={enhancing} onClick={() => void handleEnhance()}>
+                      {enhancing ? t("enhancingPhoto") : t("enhancePhoto")}
+                    </Button>
+                    <Button type="button" variant="secondary" size="sm" onClick={clearImage}>
+                      {t("qualityRetake")}
+                    </Button>
+                  </div>
+                </div>
+              )}
+              {image && enhanced && (
+                <div role="status" className="flex flex-wrap items-center gap-3 rounded-[16px] border border-success/50 bg-success/10 p-4">
+                  <ShieldCheck className="size-4 shrink-0 text-success" aria-hidden />
+                  <p className="min-w-0 flex-1 text-sm font-medium">{t("enhancedPhoto")}</p>
+                  <Button type="button" variant="secondary" size="sm" onClick={handleUseOriginal}>
+                    {t("useOriginal")}
                   </Button>
                 </div>
               )}
@@ -445,7 +529,7 @@ export function ScanPage() {
                 <ShieldCheck className="size-4 shrink-0 text-success" aria-hidden />
                 {t("privacy")}
               </p>
-              <Button type="button" size="lg" className="w-full sm:w-auto" disabled={!image} onClick={extract}>
+              <Button type="button" size="lg" className="w-full sm:w-auto" disabled={!image} onClick={() => void extract()}>
                 {t("extract")}
               </Button>
             </>
@@ -623,6 +707,7 @@ export function ScanPage() {
         }}
         onShowTips={() => setHelperTipsOpen((v) => !v)}
         onRetry={retryLast}
+        onEnhanceAndRetry={handleEnhanceAndRetry}
         onManualAdd={handleManualAdd}
         onClose={() => setHelperOpen(false)}
         labels={{
@@ -649,6 +734,7 @@ export function ScanPage() {
           showTips: t("helper.showTips"),
           hideTips: t("helper.hideTips"),
           retry: t("helper.retry"),
+          enhanceAndRetry: t("helper.enhanceAndRetry"),
           manualAdd: t("helper.manualAdd"),
         }}
       />

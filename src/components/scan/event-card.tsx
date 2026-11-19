@@ -16,6 +16,7 @@ import {
   reminderStrings,
   remindersFromStrings,
 } from "@/lib/reminders";
+import { parseTimeInput } from "@/lib/time-input";
 import { cn } from "@/lib/utils";
 
 const eventFormSchema = z.object({
@@ -120,6 +121,22 @@ export function EventCard({ event, weekStart, onChange, onDelete }: EventCardPro
   const sync = () => {
     const values = form.getValues();
     onChange(toEvent(values, event, reminders));
+  };
+
+  /**
+   * Times accept AM/PM text ("1:00 PM", "8:30am") as well as 24-hour
+   * ("13:00"): on blur, normalize to HH:mm so the Zod schema and the
+   * export bar always see a valid 24-hour time. An unreadable value
+   * is left alone so validation flags it instead of guessing.
+   */
+  const normalizeTimeField = (field: "startTime" | "endTime") => {
+    const raw = form.getValues(field) ?? "";
+    if (!raw) return;
+    const normalized = parseTimeInput(raw);
+    if (normalized && normalized !== raw) {
+      form.setValue(field, normalized, { shouldValidate: true });
+      sync();
+    }
   };
 
   const updateReminders = (next: string[]) => {
@@ -236,20 +253,24 @@ export function EventCard({ event, weekStart, onChange, onDelete }: EventCardPro
             <label htmlFor={`start-${event.id}`} className={labelCls}>{t("fieldStart")}</label>
             <input
               id={`start-${event.id}`}
-              type="time"
+              type="text"
+              inputMode="numeric"
+              placeholder={t("timePlaceholder")}
               disabled={allDay}
               className={inputCls}
-              {...form.register("startTime", { onChange: sync })}
+              {...form.register("startTime", { onChange: sync, onBlur: () => normalizeTimeField("startTime") })}
             />
           </div>
           <div>
             <label htmlFor={`end-${event.id}`} className={labelCls}>{t("fieldEnd")}</label>
             <input
               id={`end-${event.id}`}
-              type="time"
+              type="text"
+              inputMode="numeric"
+              placeholder={t("timePlaceholder")}
               disabled={allDay}
               className={inputCls}
-              {...form.register("endTime", { onChange: sync })}
+              {...form.register("endTime", { onChange: sync, onBlur: () => normalizeTimeField("endTime") })}
             />
           </div>
         </div>

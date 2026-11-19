@@ -337,6 +337,11 @@
   "qualityBlurry": "The photo looks blurry.",
   "qualityGlare": "There's a bright glare on the photo.",
   "qualityRetake": "Retake photo",
+  "enhancePhoto": "Enhance photo",
+  "enhancingPhoto": "Enhancing photo…",
+  "enhancedPhoto": "Photo enhanced for clearer reading",
+  "useOriginal": "Use original photo",
+  "timePlaceholder": "09:00 or 1:00 PM",
   "needHelp": "Need help?",
   "pasteTabPhoto": "Photo",
   "pasteTabText": "Paste text",
@@ -363,6 +368,7 @@
    "showTips": "How to take a good photo",
    "hideTips": "Hide tips",
    "retry": "Try again",
+   "enhanceAndRetry": "Enhance photo & try again",
    "manualAdd": "Add events manually"
   },
   "debug": {

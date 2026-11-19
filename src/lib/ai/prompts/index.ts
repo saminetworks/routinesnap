@@ -9,6 +9,9 @@ export const BASE_RULES = `You extract calendar events from a photo of a schedul
 RULES — follow all of them:
 - Extract ONLY what is visible in the image. Never invent a title, date, time, room, teacher, dose or venue.
 - If a field is unsure, unreadable or missing, set a low confidence (below 0.65) for that event and add a clear warning. Do not guess a value to fill the gap.
+- If the photo is blurry, dark or low quality, read the table structure carefully — use row and column positions, course codes and room numbers to work out each cell. Never invent a value to fill a gap; mark low confidence instead.
+- The schedule may be HANDWRITTEN. Read handwriting carefully and use the surrounding layout, repeated words and known names to work out unclear text. A handwritten word you cannot read goes in "warnings" — never invent it.
+- Times may be written as words, not numbers: morning, afternoon, evening, night, and Bangla সকাল (sokal), দুপুর (dupur), বিকাল (bekal), সন্ধ্যা (sondha), রাত (raat). Convert them to 24-hour times using these defaults and list the assumption: dawn 06:00, morning 09:00, noon 12:00, afternoon 14:00, evening 17:00, night 20:00, midnight 00:00. If only a time of day is given, the event lasts 1 hour. A number with a word ("9 in the evening", "9 bekal") means that hour in that part of the day — 9 in the evening is 21:00, 9 in the morning is 09:00.
 - Convert Bangla digits (০১২৩৪৫৬৭৮৯) and Japanese numerals (０-９, 一二三四五六七八九十, 午前/午後) to standard Western digits. Normalise 12-hour times to 24-hour HH:mm.
 - Keep event titles in the original language of the image.
 - Use the provided reference date to resolve relative dates ("tomorrow", "next Monday") and missing years. If the year is not visible, assume the year of the reference date and list it in "assumptions".
